@@ -1,0 +1,10 @@
+.workbuddy
+.wrangler
+deploy_netlify.py
+deploy-surge.py
+deploy.bat
+deploy-out.txt
+duomi-app.zip
+TECH_REVIEW.md
+supabase-schema.sql
+wrangler.jsonc

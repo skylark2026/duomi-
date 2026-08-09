@@ -1,0 +1,30 @@
+# 部署文件夹（不需要上传）
+duomi-deploy/
+duomi-edgeone/
+
+# 压缩包
+*.zip
+
+# 部署脚本和配置
+deploy.bat
+deploy-surge.py
+deploy_netlify.py
+check_url.py
+wrangler.jsonc
+edgeone.json
+deploy-out.txt
+
+# 内部文档
+TECH_REVIEW.md
+TECH_REVIEW_V37_FIX.md
+
+# 指南文档
+平板安装指南.md
+iPad使用指南.md
+supabase-schema.sql
+
+# 生成图片（不需要上线）
+generated-images/
+
+# 工作目录
+.workbuddy/
