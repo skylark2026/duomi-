@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+<title>多米工作台</title>
+<link rel="stylesheet" href="css/style.css?v=40">
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#5b8c3a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="多米工作台">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" href="icon-512.png">
+<script>
+// v3.6: 强制清理旧 SW + 缓存，确保加载最新代码
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => { console.log('[duomi] unregistering SW:', r.scope); r.unregister(); });
+  });
+  caches.keys().then(keys => {
+    keys.forEach(k => { console.log('[duomi] deleting cache:', k); caches.delete(k); });
+  });
+}
+</script>
+</head>
+<body>
+
+<!-- ====== 竖屏提示层 ====== -->
+<div class="orientation-overlay" id="orientationOverlay">
+  <div class="orientation-icon">📱</div>
+  <div class="orientation-text">请将设备旋转为横屏使用</div>
+  <div class="orientation-sub">多米工作台需要横屏模式才能获得最佳体验</div>
+</div>
+
+<!-- ====== 绿宝石飘落动画层 ====== -->
+<div id="starRain" class="star-rain-container"></div>
+
+<!-- ====== 顶部栏 ====== -->
+<header class="app-header">
+  <div class="header-left">
+    <span class="app-logo">⛏️</span>
+    <span class="app-title">多米工作台</span>
+  </div>
+  <div class="header-right">
+    <div class="mode-badge" id="modeBadge">假期模式</div>
+    <div class="star-display" id="starDisplay">💎 <span id="starCount">0</span></div>
+  </div>
+</header>
+
+<!-- ====== 主内容区 ====== -->
+<main class="app-main" id="appMain">
+  <!-- Tab 1: 今日日程 -->
+  <section class="tab-page active" id="tab-schedule">
+    <div class="page-header">
+      <h2>📅 日程安排</h2>
+      <p class="today-date" id="todayDate"></p>
+    </div>
+    <!-- 今日/本周切换 -->
+    <div class="view-toggle">
+      <button class="view-toggle-btn active" data-view="today">📌 今日</button>
+      <button class="view-toggle-btn" data-view="week">📆 本周</button>
+    </div>
+
+    <!-- 今日视图 -->
+    <div id="view-today" class="view-section active">
+      <div class="card-section">
+        <h3 class="section-title">📚 今日课程</h3>
+        <div id="todayCourseList" class="course-list"></div>
+      </div>
+      <div class="card-section">
+        <h3 class="section-title">✅ 今日待打卡</h3>
+        <div id="todayTaskList" class="today-task-list"></div>
+      </div>
+      <div class="star-summary-card" id="starSummaryCard">
+        <span class="star-big">💎</span>
+        <div>
+          <div class="star-num" id="starNumHome">0</div>
+          <div class="star-label">绿宝石总数</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本周视图 -->
+    <div id="view-week" class="view-section">
+      <div id="weekSchedule" class="week-schedule"></div>
+    </div>
+  </section>
+
+  <!-- Tab 2: 打卡任务 -->
+  <section class="tab-page" id="tab-tasks">
+    <div class="page-header">
+      <h2>✅ 打卡任务</h2>
+      <p class="page-subtitle">完成任务获得绿宝石奖励！</p>
+    </div>
+    <div id="taskList" class="task-list"></div>
+  </section>
+
+  <!-- Tab 3: 学习小工具 -->
+  <section class="tab-page" id="tab-tools">
+    <div class="page-header">
+      <h2>🛠 学习小工具</h2>
+    </div>
+    <div class="tools-grid">
+      <button class="tool-card" data-tool="timer" aria-label="计时器">⏱️<span>计时器</span></button>
+      <button class="tool-card" data-tool="calculator" aria-label="计算器">🧮<span>计算器</span></button>
+      <button class="tool-card" data-tool="pinyin" aria-label="拼音表">🔤<span>拼音表</span></button>
+      <button class="tool-card" data-tool="words" aria-label="单词卡">📖<span>单词卡</span></button>
+      <button class="tool-card" data-tool="memo" aria-label="备忘录">📝<span>备忘录</span></button>
+      <button class="tool-card" data-tool="math" aria-label="数学练习">🔢<span>数学练习</span></button>
+      <button class="tool-card" data-tool="fun" aria-label="趣味乐园">🎮<span>趣味乐园</span></button>
+    </div>
+
+    <!-- 计时器 -->
+    <div class="tool-panel" id="tool-timer">
+      <div class="tool-panel-header">
+        <h3>⏱️ 计时器</h3>
+        <button class="close-panel" data-close="timer" aria-label="关闭计时器">✕</button>
+      </div>
+      <div class="timer-tabs">
+        <button class="timer-tab active" data-timer-tab="pomodoro">🍅 番茄钟</button>
+        <button class="timer-tab" data-timer-tab="countdown">⏳ 倒计时</button>
+      </div>
+      <div class="timer-display" id="timerDisplay">25:00</div>
+      <div class="timer-controls">
+        <button class="timer-btn" id="timerStart">▶ 开始</button>
+        <button class="timer-btn" id="timerPause">⏸ 暂停</button>
+        <button class="timer-btn" id="timerReset">🔄 重置</button>
+      </div>
+      <div class="timer-presets" id="timerPresets"></div>
+      <!-- 自定义计时器 -->
+      <div class="timer-custom">
+        <span class="timer-custom-label">自定义</span>
+        <input type="number" class="timer-custom-input" id="timerCustomInput" min="1" max="120" placeholder="分钟" aria-label="自定义分钟数">
+        <span class="timer-custom-label">分钟</span>
+        <button class="timer-custom-btn" id="timerCustomBtn" aria-label="设置自定义时间">设置</button>
+      </div>
+    </div>
+
+    <!-- 计算器 -->
+    <div class="tool-panel" id="tool-calculator">
+      <div class="tool-panel-header">
+        <h3>🧮 计算器</h3>
+        <button class="close-panel" data-close="calculator" aria-label="关闭计算器">✕</button>
+      </div>
+      <div class="calc-display" id="calcDisplay">0</div>
+      <div class="calc-buttons" id="calcButtons"></div>
+    </div>
+
+    <!-- 拼音表 -->
+    <div class="tool-panel" id="tool-pinyin">
+      <div class="tool-panel-header">
+        <h3>🔤 拼音表</h3>
+        <button class="close-panel" data-close="pinyin" aria-label="关闭拼音表">✕</button>
+      </div>
+      <div class="pinyin-content" id="pinyinContent"></div>
+    </div>
+
+    <!-- 单词卡 -->
+    <div class="tool-panel" id="tool-words">
+      <div class="tool-panel-header">
+        <h3>📖 单词卡</h3>
+        <button class="close-panel" data-close="words" aria-label="关闭单词卡">✕</button>
+      </div>
+      <div class="word-card-area">
+        <div class="word-card" id="wordCard">
+          <div class="word-card-word" id="wordCardWord">点击下方按钮开始</div>
+          <div class="word-card-meaning" id="wordCardMeaning"></div>
+        </div>
+        <div class="word-card-controls">
+          <button class="word-btn" id="wordPrev" aria-label="上一个">⬅ 上一个</button>
+          <button class="word-btn" id="wordFlip" aria-label="翻转">🔄 翻转</button>
+          <button class="word-btn" id="wordNext" aria-label="下一个">下一个 ➡</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 备忘录 -->
+    <div class="tool-panel" id="tool-memo">
+      <div class="tool-panel-header">
+        <h3>📝 备忘录</h3>
+        <button class="close-panel" data-close="memo" aria-label="关闭备忘录">✕</button>
+      </div>
+      <div class="memo-input-area">
+        <input type="text" class="memo-input" id="memoInput" placeholder="写点什么..." maxlength="200">
+        <button class="memo-add-btn" id="memoAddBtn">添加</button>
+      </div>
+      <div id="memoList" class="memo-list"></div>
+    </div>
+
+    <!-- 数学练习 -->
+    <div class="tool-panel" id="tool-math">
+      <div class="tool-panel-header">
+        <h3>🔢 数学练习</h3>
+        <button class="close-panel" data-close="math" aria-label="关闭数学练习">✕</button>
+      </div>
+
+      <!-- 开始界面 -->
+      <div id="mathStart" class="math-start">
+        <div class="math-start-icon">🔢</div>
+        <div class="math-start-title">每日数学挑战</div>
+        <div class="math-start-subtitle">学而思一年级 · 每天10题</div>
+        <div class="math-difficulty-row">
+          <span class="math-diff-label">难度</span>
+          <div class="math-diff-btns" id="mathDiffBtns">
+            <button class="math-diff-btn active" data-diff="easy">🟢 简单</button>
+            <button class="math-diff-btn" data-diff="medium">🟡 中等</button>
+            <button class="math-diff-btn" data-diff="hard">🔴 困难</button>
+          </div>
+        </div>
+        <div class="math-start-info" id="mathStartInfo"></div>
+        <button class="math-start-btn" id="mathStartBtn">开始练习</button>
+        <div class="math-start-stats" id="mathStartStats"></div>
+      </div>
+
+      <!-- 答题界面 -->
+      <div id="mathQuiz" class="math-quiz" style="display:none;">
+        <div class="math-quiz-topbar">
+          <button class="math-exit-btn" id="mathExitBtn" aria-label="临时退出">✕ 暂停</button>
+          <span class="math-progress-text" id="mathProgress">第 1 / 10 题</span>
+          <span class="math-progress-dots" id="mathDots"></span>
+        </div>
+        <div class="math-question" id="mathQuestion"></div>
+        <div class="math-answer-area" id="mathAnswerArea"></div>
+        <div class="math-feedback" id="mathFeedback"></div>
+        <div class="math-quiz-nav">
+          <button class="math-nav-btn" id="mathNextBtn" style="display:none;">下一题 ➡</button>
+        </div>
+      </div>
+
+      <!-- 结果界面 -->
+      <div id="mathResult" class="math-result" style="display:none;">
+        <div class="math-result-icon" id="mathResultIcon">🎉</div>
+        <div class="math-result-title" id="mathResultTitle">练习完成！</div>
+        <div class="math-result-score" id="mathResultScore"></div>
+        <div class="math-result-detail" id="mathResultDetail"></div>
+        <button class="math-result-btn" id="mathRetryBtn">再练一组</button>
+      </div>
+    </div>
+
+    <!-- 趣味乐园 - 旅行青蛙游戏 -->
+    <div class="tool-panel" id="tool-fun">
+      <div class="tool-panel-header">
+        <h3>🎮 趣味乐园</h3>
+        <button class="close-panel" data-close="fun" aria-label="关闭趣味乐园">✕</button>
+      </div>
+
+      <!-- 状态条 -->
+      <div class="fun-status-bar" id="funStatusBar"></div>
+
+      <!-- 主画面：在家 -->
+      <div id="funHome" class="fun-screen">
+        <div class="fun-pet-home">
+          <div class="fun-pet-scene" id="funPetScene">🏠</div>
+          <div class="fun-pet-avatar-large" id="funPetAvatarLarge">🧑</div>
+          <div class="fun-pet-name-label" id="funPetNameLabel">小宠物在家休息</div>
+          <div class="fun-pet-actions">
+            <button class="fun-action-btn primary" id="funPrepareBtn">🎒 准备出发</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 准备行李画面 -->
+      <div id="funPrepare" class="fun-screen" style="display:none;">
+        <div class="fun-prepare-section">
+          <h4>1️⃣ 选择行李</h4>
+          <div class="fun-items-grid" id="funItemsGrid"></div>
+        </div>
+        <div class="fun-prepare-section">
+          <h4>2️⃣ 选择目的地</h4>
+          <div class="fun-destinations" id="funDestinations"></div>
+        </div>
+        <div class="fun-prepare-summary" id="funPrepareSummary"></div>
+        <div class="fun-prepare-actions">
+          <button class="fun-cancel-btn" id="funCancelPrepare">← 返回</button>
+          <button class="fun-go-btn" id="funGoBtn" disabled>🚀 出发！</button>
+        </div>
+      </div>
+
+      <!-- 旅行中画面 -->
+      <div id="funTraveling" class="fun-screen" style="display:none;">
+        <div class="fun-travel-scene">
+          <div class="fun-travel-emoji" id="funTravelEmoji">✈️</div>
+          <div class="fun-travel-dest" id="funTravelDest"></div>
+        </div>
+        <div class="fun-travel-timer" id="funTravelTimer">--:--</div>
+        <div class="fun-travel-progress-bar">
+          <div class="fun-travel-progress-fill" id="funTravelProgress" style="width:0%"></div>
+        </div>
+        <div class="fun-travel-info" id="funTravelInfo"></div>
+      </div>
+
+      <!-- 归来画面 -->
+      <div id="funReturn" class="fun-screen" style="display:none;">
+        <div class="fun-return-banner">🎉 小宠物回来啦！</div>
+        <div class="fun-postcard" id="funPostcard"></div>
+        <div class="fun-souvenirs-row" id="funSouvenirs"></div>
+        <div class="fun-gems-reward" id="funGemsReward"></div>
+        <button class="fun-action-btn primary" id="funCollectBtn">收下礼物 🎁</button>
+      </div>
+
+      <!-- 收藏区 -->
+      <div class="fun-collection">
+        <div class="fun-collection-tabs">
+          <button class="fun-col-tab active" data-col-tab="postcards">📮 明信片</button>
+          <button class="fun-col-tab" data-col-tab="souvenirs">🎁 纪念品</button>
+        </div>
+        <div class="fun-collection-content" id="funCollectionContent"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tab 4: 我的奖励 -->
+  <section class="tab-page" id="tab-rewards">
+    <div class="page-header">
+      <h2>🎁 我的奖励</h2>
+    </div>
+
+    <!-- 小宠物 -->
+    <div class="pet-card" id="petCard">
+      <div class="pet-avatar" id="petAvatar">🥚</div>
+      <div class="pet-info">
+        <div class="pet-name" id="petName">小鸡</div>
+        <div class="pet-level-badge" id="petLevelBadge">Lv.1</div>
+        <div class="pet-progress-bar">
+          <div class="pet-progress-fill" id="petProgressFill" style="width: 0%"></div>
+        </div>
+        <div class="pet-progress-text" id="petProgressText">累计 0 / 30 💎</div>
+        <div class="pet-hint" id="petHint">再获得 30 颗绿宝石，小宠物就会进化！</div>
+      </div>
+    </div>
+
+    <div class="reward-star-card">
+      <span class="star-big">💎</span>
+      <div>
+        <div class="star-num" id="starNumReward">0</div>
+        <div class="star-label">绿宝石总数</div>
+      </div>
+    </div>
+    <div class="card-section">
+      <h3 class="section-title">🏆 奖励兑换池</h3>
+      <div id="rewardPool" class="reward-pool-list"></div>
+    </div>
+    <div class="card-section">
+      <h3 class="section-title">📋 打卡历史</h3>
+      <div id="checkinHistory" class="checkin-history-list"></div>
+    </div>
+  </section>
+
+  <!-- Tab 5: 设置 -->
+  <section class="tab-page" id="tab-settings">
+    <div class="page-header">
+      <h2>⚙️ 设置</h2>
+    </div>
+    <div class="settings-section">
+      <h3 class="section-title">🔀 模式切换</h3>
+      <div class="mode-switcher">
+        <button class="mode-btn" id="modeHoliday">🏖️ 假期模式</button>
+        <button class="mode-btn" id="modeSchool">🏫 开学模式</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3 class="section-title">🔊 声音与动画</h3>
+      <div class="sound-toggle">
+        <span class="sound-toggle-label">🔊 提示音</span>
+        <div class="sound-switch on" id="soundSwitch" role="switch" aria-checked="true" aria-label="提示音开关" tabindex="0"></div>
+      </div>
+      <div class="sound-toggle">
+        <span class="sound-toggle-label">🗣️ 语音播报</span>
+        <div class="sound-switch on" id="speechSwitch" role="switch" aria-checked="true" aria-label="语音播报开关" tabindex="0"></div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3 class="section-title">🔐 家长管理</h3>
+      <button class="parent-btn" id="parentModeBtn">🔑 进入家长模式</button>
+      <div id="parentPanel" class="parent-panel hidden">
+        <div class="parent-tab-bar">
+          <button class="parent-tab-btn active" data-parent-tab="schedule">📋 课表编辑</button>
+          <button class="parent-tab-btn" data-parent-tab="tasks">✅ 任务编辑</button>
+          <button class="parent-tab-btn" data-parent-tab="rewards">🎁 奖励编辑</button>
+          <button class="parent-tab-btn" data-parent-tab="password">🔑 修改密码</button>
+        </div>
+
+        <!-- 课表编辑 -->
+        <div class="parent-tab-content active" id="parent-schedule">
+          <h4>当前模式课程列表</h4>
+          <div id="scheduleEditList" class="edit-list"></div>
+          <h4>添加课程（按星期）</h4>
+          <div class="edit-form" id="scheduleForm">
+            <select id="schDay"><option value="0">周日</option><option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="weekday">工作日</option></select>
+            <input type="time" id="schStart" value="08:00">
+            <input type="time" id="schEnd" value="09:00">
+            <input type="text" id="schTitle" placeholder="课程名称" maxlength="20">
+            <button class="add-btn" id="schAddBtn">➕ 添加</button>
+          </div>
+          <h4>添加临时日程（按日期）</h4>
+          <div class="edit-form" id="customScheduleForm">
+            <input type="date" id="customDate">
+            <input type="time" id="customStart" value="15:00">
+            <input type="time" id="customEnd" value="16:30">
+            <input type="text" id="customTitle" placeholder="课程名称" maxlength="20">
+            <button class="add-btn" id="customAddBtn">➕ 添加临时</button>
+          </div>
+          <div id="customScheduleList" class="edit-list" style="margin-top: 12px;"></div>
+        </div>
+
+        <!-- 任务编辑 -->
+        <div class="parent-tab-content" id="parent-tasks">
+          <h4>作业科目管理</h4>
+          <div id="homeworkSubjectsList" class="edit-list"></div>
+          <div class="edit-form" id="hwSubjectForm">
+            <input type="text" id="hwSubjectName" placeholder="科目名称（如：语文）" maxlength="10">
+            <button class="add-btn" id="hwSubjectAddBtn">➕ 添加科目</button>
+          </div>
+          <h4>今日作业科目</h4>
+          <div id="dailySubjectsSection" class="daily-subjects-section"></div>
+          <h4>打卡任务列表</h4>
+          <div id="tasksEditList" class="edit-list"></div>
+          <h4>添加打卡任务</h4>
+          <div class="edit-form" id="taskForm">
+            <input type="text" id="taskName" placeholder="任务名称" maxlength="10">
+            <input type="text" id="taskIcon" placeholder="图标emoji" maxlength="4" value="📌">
+            <input type="number" id="taskStars" placeholder="绿宝石数" value="2" min="1" max="10">
+            <button class="add-btn" id="taskAddBtn">➕ 添加</button>
+          </div>
+        </div>
+
+        <!-- 奖励编辑 -->
+        <div class="parent-tab-content" id="parent-rewards">
+          <h4>奖励池列表</h4>
+          <div id="rewardsEditList" class="edit-list"></div>
+          <h4>添加奖励</h4>
+          <div class="edit-form" id="rewardForm">
+            <input type="text" id="rewardName" placeholder="奖励名称" maxlength="20">
+            <input type="text" id="rewardIcon" placeholder="图标emoji" maxlength="4" value="🎁">
+            <input type="number" id="rewardCost" placeholder="需要绿宝石" value="10" min="1">
+            <button class="add-btn" id="rewardAddBtn">➕ 添加</button>
+          </div>
+        </div>
+
+        <!-- 修改密码 -->
+        <div class="parent-tab-content" id="parent-password">
+          <h4>修改家长密码</h4>
+          <div class="edit-form vertical" id="passwordForm">
+            <input type="password" id="newPassword" placeholder="新密码（4位数字）" maxlength="4" inputmode="numeric">
+            <input type="password" id="confirmPassword" placeholder="确认密码" maxlength="4" inputmode="numeric">
+            <button class="add-btn" id="passwordSaveBtn">💾 保存</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3 class="section-title">ℹ️ 关于</h3>
+      <p class="about-text">多米工作台 v4.0<br>支持添加到主屏幕，离线可用。数据保存在本地浏览器，清除浏览器缓存将丢失数据。</p>
+    </div>
+  </section>
+</main>
+
+<!-- ====== 底部Tab导航 ====== -->
+<nav class="tab-nav">
+  <button class="tab-nav-btn active" data-tab="schedule" aria-label="今日日程">
+    <span class="tab-icon">📅</span><span class="tab-label">今日日程</span>
+  </button>
+  <button class="tab-nav-btn" data-tab="tasks" aria-label="打卡任务">
+    <span class="tab-icon">✅</span><span class="tab-label">打卡任务</span>
+  </button>
+  <button class="tab-nav-btn" data-tab="tools" aria-label="学习工具">
+    <span class="tab-icon">🛠</span><span class="tab-label">学习工具</span>
+  </button>
+  <button class="tab-nav-btn" data-tab="rewards" aria-label="我的奖励">
+    <span class="tab-icon">🎁</span><span class="tab-label">我的奖励</span>
+  </button>
+  <button class="tab-nav-btn" data-tab="settings" aria-label="设置">
+    <span class="tab-icon">⚙️</span><span class="tab-label">设置</span>
+  </button>
+</nav>
+
+<!-- ====== 密码弹窗 ====== -->
+<div class="modal-overlay" id="passwordModal">
+  <div class="modal-box">
+    <h3>🔐 家长验证</h3>
+    <p class="modal-hint" id="passwordModalHint">请输入4位数字密码</p>
+    <input type="password" id="passwordInput" maxlength="4" inputmode="numeric" placeholder="••••">
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" id="passwordCancel">取消</button>
+      <button class="modal-btn confirm" id="passwordConfirm">确认</button>
+    </div>
+    <p class="modal-error" id="passwordError"></p>
+  </div>
+</div>
+
+<!-- ====== 兑换确认弹窗 ====== -->
+<div class="modal-overlay" id="redeemModal">
+  <div class="modal-box">
+    <h3 id="redeemTitle">🎁 兑换奖励</h3>
+    <p id="redeemText"></p>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" id="redeemCancel">取消</button>
+      <button class="modal-btn confirm" id="redeemConfirm">确认兑换</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 删除确认弹窗 ====== -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box">
+    <h3 id="confirmTitle">⚠️ 确认删除</h3>
+    <p id="confirmText">确定要删除吗？</p>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" id="confirmNo">取消</button>
+      <button class="modal-btn confirm" id="confirmYes">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Toast 提示 ====== -->
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
+<script src="js/app.js?v=40"></script>
+<script>
+  // Service Worker 注册（暂时注释掉，先排除 SW 缓存干扰）
+  // if ('serviceWorker' in navigator) {
+  //   window.addEventListener('load', function() {
+  //     navigator.serviceWorker.register('sw.js').then(function(reg) {
+  //       console.log('PWA已就绪，可添加到主屏幕');
+  //     }).catch(function(err) {
+  //       console.warn('SW注册失败:', err);
+  //     });
+  //   });
+  // }
+</script>
+</body>
+</html>
