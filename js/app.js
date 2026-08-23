@@ -53,20 +53,8 @@ const DEFAULT_DATA = {
   },
   checkins: {},   // { '2026-08-08': { 't1': true, 't2': true } }
   redeemed: [],   // { id, rewardId, rewardName, cost, date, time }
-  wordCards: [
-    { word: 'apple', meaning: '苹果' },
-    { word: 'banana', meaning: '香蕉' },
-    { word: 'cat', meaning: '猫' },
-    { word: 'dog', meaning: '狗' },
-    { word: 'egg', meaning: '鸡蛋' },
-    { word: 'fish', meaning: '鱼' },
-    { word: 'book', meaning: '书' },
-    { word: 'milk', meaning: '牛奶' },
-    { word: 'sun', meaning: '太阳' },
-    { word: 'moon', meaning: '月亮' },
-    { word: 'water', meaning: '水' },
-    { word: 'tree', meaning: '树' }
-  ],
+  wordCards: [],
+  nce1Lesson: 0,
   memos: [],  // { id, text, date }
   mathPractice: {
     lastDate: '',      // '2026-08-09'
@@ -1532,6 +1520,84 @@ const Calculator = {
 };
 
 /* ====== 拼音表 ====== */
+/* 拼音→示范汉字映射：点击时朗读汉字（zh-CN），产生正确的拼音发音 */
+const PINYIN_SOUNDS = {
+  // 声母
+  'b':  { char: '波', example: '玻' },
+  'p':  { char: '坡', example: '坡' },
+  'm':  { char: '摸', example: '摸' },
+  'f':  { char: '佛', example: '佛' },
+  'd':  { char: '得', example: '得' },
+  't':  { char: '特', example: '特' },
+  'n':  { char: '讷', example: '讷' },
+  'l':  { char: '勒', example: '勒' },
+  'g':  { char: '哥', example: '哥' },
+  'k':  { char: '科', example: '科' },
+  'h':  { char: '喝', example: '喝' },
+  'j':  { char: '鸡', example: '鸡' },
+  'q':  { char: '七', example: '七' },
+  'x':  { char: '西', example: '西' },
+  'zh': { char: '知', example: '知' },
+  'ch': { char: '吃', example: '吃' },
+  'sh': { char: '狮', example: '狮' },
+  'r':  { char: '日', example: '日' },
+  'z':  { char: '资', example: '资' },
+  'c':  { char: '刺', example: '刺' },
+  's':  { char: '丝', example: '丝' },
+  'y':  { char: '衣', example: '衣' },
+  'w':  { char: '屋', example: '屋' },
+  // 韵母
+  'a':  { char: '啊', example: '啊' },
+  'o':  { char: '喔', example: '喔' },
+  'e':  { char: '鹅', example: '鹅' },
+  'i':  { char: '衣', example: '衣' },
+  'u':  { char: '乌', example: '乌' },
+  'ü':  { char: '鱼', example: '鱼' },
+  'ai': { char: '爱', example: '爱' },
+  'ei': { char: '欸', example: '欸' },
+  'ui': { char: '威', example: '威' },
+  'ao': { char: '袄', example: '袄' },
+  'ou': { char: '欧', example: '欧' },
+  'iu': { char: '优', example: '优' },
+  'ie': { char: '耶', example: '耶' },
+  'üe': { char: '约', example: '约' },
+  'er': { char: '儿', example: '儿' },
+  'an': { char: '安', example: '安' },
+  'en': { char: '恩', example: '恩' },
+  'in': { char: '音', example: '音' },
+  'un': { char: '温', example: '温' },
+  'ün': { char: '晕', example: '晕' },
+  'ang':{ char: '昂', example: '昂' },
+  'eng':{ char: '亨', example: '亨' },
+  'ing':{ char: '英', example: '英' },
+  'ong':{ char: '轰', example: '轰' },
+  // 声调示例（四声示范字）
+  'ā':  { char: '阿', example: '阿' },
+  'á':  { char: '啊', example: '啊' },
+  'ǎ':  { char: '啊', example: '啊' },
+  'à':  { char: '啊', example: '啊' },
+  'ō':  { char: '喔', example: '喔' },
+  'ó':  { char: '哦', example: '哦' },
+  'ǒ':  { char: '哦', example: '哦' },
+  'ò':  { char: '哦', example: '哦' },
+  'ē':  { char: '婀', example: '婀' },
+  'é':  { char: '鹅', example: '鹅' },
+  'ě':  { char: '恶', example: '恶' },
+  'è':  { char: '饿', example: '饿' },
+  'ī':  { char: '衣', example: '衣' },
+  'í':  { char: '姨', example: '姨' },
+  'ǐ':  { char: '椅', example: '椅' },
+  'ì':  { char: '意', example: '意' },
+  'ū':  { char: '乌', example: '乌' },
+  'ú':  { char: '无', example: '无' },
+  'ǔ':  { char: '五', example: '五' },
+  'ù':  { char: '物', example: '物' },
+  'ǖ':  { char: '迂', example: '迂' },
+  'ǘ':  { char: '鱼', example: '鱼' },
+  'ǚ':  { char: '雨', example: '雨' },
+  'ǜ':  { char: '玉', example: '玉' }
+};
+
 const Pinyin = {
   initials: ['b','p','m','f','d','t','n','l','g','k','h','j','q','x','zh','ch','sh','r','z','c','s','y','w'],
   finals: ['a','o','e','i','u','ü','ai','ei','ui','ao','ou','iu','ie','üe','er','an','en','in','un','ün','ang','eng','ing','ong'],
@@ -1539,74 +1605,753 @@ const Pinyin = {
 
   init() {
     const el = document.getElementById('pinyinContent');
+    const cellHTML = (s) => {
+      const info = PINYIN_SOUNDS[s];
+      const exChar = info ? info.example : '';
+      return `<div class="pinyin-cell" data-pinyin="${esc(s)}">
+        <span class="pinyin-text">${esc(s)}</span>
+        ${exChar ? `<span class="pinyin-char">${esc(exChar)}</span>` : ''}
+      </div>`;
+    };
     el.innerHTML = `
+      <div class="pinyin-hint">💡 点击拼音听发音，下方汉字为示范字</div>
       <div class="pinyin-section">
         <h4>声母（${this.initials.length}个）</h4>
         <div class="pinyin-grid">
-          ${this.initials.map(s => `<div class="pinyin-cell" data-pinyin="${esc(s)}">${esc(s)}</div>`).join('')}
+          ${this.initials.map(s => cellHTML(s)).join('')}
         </div>
       </div>
       <div class="pinyin-section">
         <h4>韵母（${this.finals.length}个）</h4>
         <div class="pinyin-grid">
-          ${this.finals.map(s => `<div class="pinyin-cell" data-pinyin="${esc(s)}">${esc(s)}</div>`).join('')}
+          ${this.finals.map(s => cellHTML(s)).join('')}
         </div>
       </div>
       <div class="pinyin-section">
-        <h4>声调示例</h4>
+        <h4>声调示例（四声）</h4>
         <div class="pinyin-grid">
-          ${this.tones.map(s => `<div class="pinyin-cell" data-pinyin="${esc(s)}">${esc(s)}</div>`).join('')}
+          ${this.tones.map(s => cellHTML(s)).join('')}
         </div>
       </div>
     `;
-    // 点击拼音格语音朗读
+    // 点击拼音格语音朗读：用中文TTS朗读示范汉字，产生正确的拼音发音
     el.querySelectorAll('.pinyin-cell').forEach(cell => {
       cell.addEventListener('click', () => {
-        speak(cell.dataset.pinyin);
+        const py = cell.dataset.pinyin;
+        const info = PINYIN_SOUNDS[py];
+        if (info) {
+          // 用中文TTS朗读示范汉字
+          speak(info.char, 'zh-CN');
+        } else {
+          speak(py, 'zh-CN');
+        }
       });
     });
   }
 };
 
+/* ====== 新概念英语第一册词汇 ====== */
+const NCE1_VOCAB = [
+  { lesson: 1, title: '第1-2课: Excuse me!', words: [
+    { word: 'excuse', phonetic: '/ɪkˈskjuːz/', meaning: '原谅' },
+    { word: 'handbag', phonetic: '/ˈhændbæɡ/', meaning: '手提包' },
+    { word: 'pardon', phonetic: '/ˈpɑːdn/', meaning: '再说一遍' },
+    { word: 'thank you', phonetic: '/θæŋk juː/', meaning: '谢谢你' },
+  ]},
+  { lesson: 3, title: '第3-4课: Sorry, sir', words: [
+    { word: 'sorry', phonetic: '/ˈsɒri/', meaning: '对不起' },
+    { word: 'sir', phonetic: '/sɜː/', meaning: '先生' },
+    { word: 'cloakroom', phonetic: '/ˈkləʊkruːm/', meaning: '衣帽存放处' },
+    { word: 'suit', phonetic: '/suːt/', meaning: '套装' },
+    { word: 'school', phonetic: '/skuːl/', meaning: '学校' },
+    { word: 'teacher', phonetic: '/ˈtiːtʃə/', meaning: '老师' },
+    { word: 'son', phonetic: '/sʌn/', meaning: '儿子' },
+    { word: 'daughter', phonetic: '/ˈdɔːtə/', meaning: '女儿' },
+  ]},
+  { lesson: 5, title: '第5-6课: Nice to meet you', words: [
+    { word: 'morning', phonetic: '/ˈmɔːnɪŋ/', meaning: '早上' },
+    { word: 'Miss', phonetic: '/mɪs/', meaning: '小姐' },
+    { word: 'new', phonetic: '/njuː/', meaning: '新的' },
+    { word: 'student', phonetic: '/ˈstjuːdnt/', meaning: '学生' },
+    { word: 'French', phonetic: '/frentʃ/', meaning: '法国的' },
+    { word: 'German', phonetic: '/ˈdʒɜːmən/', meaning: '德国的' },
+    { word: 'nice', phonetic: '/naɪs/', meaning: '美好的' },
+    { word: 'meet', phonetic: '/miːt/', meaning: '遇见' },
+    { word: 'Japanese', phonetic: '/ˌdʒæpəˈniːz/', meaning: '日本人' },
+    { word: 'Korean', phonetic: '/kəˈriːən/', meaning: '韩国人' },
+    { word: 'Chinese', phonetic: '/ˌtʃaɪˈniːz/', meaning: '中国人' },
+    { word: 'too', phonetic: '/tuː/', meaning: '也' },
+  ]},
+  { lesson: 7, title: '第7-8课: Are you a teacher?', words: [
+    { word: 'name', phonetic: '/neɪm/', meaning: '名字' },
+    { word: 'nationality', phonetic: '/ˌnæʃəˈnæləti/', meaning: '国籍' },
+    { word: 'job', phonetic: '/dʒɒb/', meaning: '工作' },
+    { word: 'keyboard', phonetic: '/ˈkiːbɔːd/', meaning: '键盘' },
+    { word: 'operator', phonetic: '/ˈɒpəreɪtə/', meaning: '操作员' },
+    { word: 'engineer', phonetic: '/ˌendʒɪˈnɪə/', meaning: '工程师' },
+    { word: 'policeman', phonetic: '/pəˈliːsmən/', meaning: '警察' },
+    { word: 'hairdresser', phonetic: '/ˈheədresə/', meaning: '理发师' },
+    { word: 'housewife', phonetic: '/ˈhaʊswaɪf/', meaning: '家庭主妇' },
+    { word: 'milkman', phonetic: '/ˈmɪlkmən/', meaning: '送牛奶的人' },
+  ]},
+  { lesson: 9, title: '第9-10课: How are you today?', words: [
+    { word: 'hello', phonetic: '/həˈləʊ/', meaning: '你好' },
+    { word: 'hi', phonetic: '/haɪ/', meaning: '嗨' },
+    { word: 'today', phonetic: '/təˈdeɪ/', meaning: '今天' },
+    { word: 'well', phonetic: '/wel/', meaning: '身体好' },
+    { word: 'fine', phonetic: '/faɪn/', meaning: '很好的' },
+    { word: 'thanks', phonetic: '/θæŋks/', meaning: '谢谢' },
+    { word: 'goodbye', phonetic: '/ˌɡʊdˈbaɪ/', meaning: '再见' },
+    { word: 'see', phonetic: '/siː/', meaning: '见' },
+    { word: 'fat', phonetic: '/fæt/', meaning: '胖的' },
+    { word: 'thin', phonetic: '/θɪn/', meaning: '瘦的' },
+    { word: 'tall', phonetic: '/tɔːl/', meaning: '高的' },
+    { word: 'short', phonetic: '/ʃɔːt/', meaning: '矮的' },
+    { word: 'dirty', phonetic: '/ˈdɜːti/', meaning: '脏的' },
+    { word: 'clean', phonetic: '/kliːn/', meaning: '干净的' },
+    { word: 'hot', phonetic: '/hɒt/', meaning: '热的' },
+    { word: 'cold', phonetic: '/kəʊld/', meaning: '冷的' },
+    { word: 'old', phonetic: '/əʊld/', meaning: '老的' },
+    { word: 'young', phonetic: '/jʌŋ/', meaning: '年轻的' },
+    { word: 'busy', phonetic: '/ˈbɪzi/', meaning: '忙的' },
+    { word: 'lazy', phonetic: '/ˈleɪzi/', meaning: '懒的' },
+  ]},
+  { lesson: 11, title: '第11-12课: Is this your shirt?', words: [
+    { word: 'whose', phonetic: '/huːz/', meaning: '谁的' },
+    { word: 'blue', phonetic: '/bluː/', meaning: '蓝色的' },
+    { word: 'perhaps', phonetic: '/pəˈhæps/', meaning: '也许' },
+    { word: 'white', phonetic: '/waɪt/', meaning: '白色的' },
+    { word: 'catch', phonetic: '/kætʃ/', meaning: '抓住' },
+    { word: 'father', phonetic: '/ˈfɑːðə/', meaning: '父亲' },
+    { word: 'mother', phonetic: '/ˈmʌðə/', meaning: '母亲' },
+    { word: 'blouse', phonetic: '/blaʊz/', meaning: '女衬衫' },
+    { word: 'sister', phonetic: '/ˈsɪstə/', meaning: '姐妹' },
+    { word: 'tie', phonetic: '/taɪ/', meaning: '领带' },
+    { word: 'brother', phonetic: '/ˈbrʌðə/', meaning: '兄弟' },
+    { word: 'his', phonetic: '/hɪz/', meaning: '他的' },
+    { word: 'her', phonetic: '/hɜː/', meaning: '她的' },
+  ]},
+  { lesson: 13, title: '第13-14课: A new dress', words: [
+    { word: 'same', phonetic: '/seɪm/', meaning: '相同的' },
+    { word: 'lovely', phonetic: '/ˈlʌvli/', meaning: '可爱的' },
+    { word: 'hat', phonetic: '/hæt/', meaning: '帽子' },
+    { word: 'green', phonetic: '/ɡriːn/', meaning: '绿色的' },
+    { word: 'come', phonetic: '/kʌm/', meaning: '来' },
+    { word: 'upstairs', phonetic: '/ˌʌpˈsteəz/', meaning: '楼上' },
+    { word: 'smart', phonetic: '/smɑːt/', meaning: '时髦的' },
+    { word: 'dress', phonetic: '/dres/', meaning: '连衣裙' },
+    { word: 'case', phonetic: '/keɪs/', meaning: '箱子' },
+    { word: 'carpet', phonetic: '/ˈkɑːpɪt/', meaning: '地毯' },
+    { word: 'dog', phonetic: '/dɒɡ/', meaning: '狗' },
+  ]},
+  { lesson: 15, title: '第15-16课: Your passports, please', words: [
+    { word: 'customs', phonetic: '/ˈkʌstəmz/', meaning: '海关' },
+    { word: 'officer', phonetic: '/ˈɒfɪsə/', meaning: '官员' },
+    { word: 'Danish', phonetic: '/ˈdeɪnɪʃ/', meaning: '丹麦的' },
+    { word: 'friend', phonetic: '/frend/', meaning: '朋友' },
+    { word: 'Norwegian', phonetic: '/nɔːˈwiːdʒən/', meaning: '挪威的' },
+    { word: 'passport', phonetic: '/ˈpɑːspɔːt/', meaning: '护照' },
+    { word: 'black', phonetic: '/blæk/', meaning: '黑色的' },
+    { word: 'grey', phonetic: '/ɡreɪ/', meaning: '灰色的' },
+    { word: 'red', phonetic: '/red/', meaning: '红色的' },
+    { word: 'orange', phonetic: '/ˈɒrɪndʒ/', meaning: '橘色的' },
+    { word: 'yellow', phonetic: '/ˈjeləʊ/', meaning: '黄色的' },
+  ]},
+  { lesson: 17, title: '第17-18课: How do you do?', words: [
+    { word: 'employee', phonetic: '/ɪmˈplɔɪiː/', meaning: '雇员' },
+    { word: 'hard-working', phonetic: '/ˌhɑːdˈwɜːkɪŋ/', meaning: '勤劳的' },
+    { word: 'sales rep', phonetic: '/seɪlz rep/', meaning: '销售代表' },
+    { word: 'man', phonetic: '/mæn/', meaning: '男人' },
+    { word: 'office', phonetic: '/ˈɒfɪs/', meaning: '办公室' },
+    { word: 'assistant', phonetic: '/əˈsɪstənt/', meaning: '助手' },
+    { word: 'tall', phonetic: '/tɔːl/', meaning: '高的' },
+    { word: 'short', phonetic: '/ʃɔːt/', meaning: '矮的' },
+    { word: 'overweight', phonetic: '/ˌəʊvəˈweɪt/', meaning: '超重的' },
+    { word: 'funny', phonetic: '/ˈfʌni/', meaning: '滑稽的' },
+  ]},
+  { lesson: 19, title: '第19-20课: Tired and thirsty', words: [
+    { word: 'matter', phonetic: '/ˈmætə/', meaning: '事情' },
+    { word: 'children', phonetic: '/ˈtʃɪldrən/', meaning: '孩子们' },
+    { word: 'boy', phonetic: '/bɔɪ/', meaning: '男孩' },
+    { word: 'tired', phonetic: '/ˈtaɪəd/', meaning: '累的' },
+    { word: 'thirsty', phonetic: '/ˈθɜːsti/', meaning: '渴的' },
+    { word: 'mum', phonetic: '/mʌm/', meaning: '妈妈' },
+    { word: 'sit down', phonetic: '/sɪt daʊn/', meaning: '坐下' },
+    { word: 'ice cream', phonetic: '/aɪs kriːm/', meaning: '冰淇淋' },
+    { word: 'big', phonetic: '/bɪɡ/', meaning: '大的' },
+    { word: 'small', phonetic: '/smɔːl/', meaning: '小的' },
+    { word: 'open', phonetic: '/ˈəʊpən/', meaning: '打开的' },
+    { word: 'shut', phonetic: '/ʃʌt/', meaning: '关着的' },
+    { word: 'light', phonetic: '/laɪt/', meaning: '轻的' },
+    { word: 'heavy', phonetic: '/ˈhevi/', meaning: '重的' },
+    { word: 'long', phonetic: '/lɒŋ/', meaning: '长的' },
+  ]},
+  { lesson: 21, title: '第21-22课: Which book?', words: [
+    { word: 'give', phonetic: '/ɡɪv/', meaning: '给' },
+    { word: 'one', phonetic: '/wʌn/', meaning: '一个' },
+    { word: 'which', phonetic: '/wɪtʃ/', meaning: '哪一个' },
+    { word: 'empty', phonetic: '/ˈempti/', meaning: '空的' },
+    { word: 'full', phonetic: '/fʊl/', meaning: '满的' },
+    { word: 'large', phonetic: '/lɑːdʒ/', meaning: '大的' },
+    { word: 'little', phonetic: '/ˈlɪtl/', meaning: '小的' },
+    { word: 'sharp', phonetic: '/ʃɑːp/', meaning: '锋利的' },
+    { word: 'small', phonetic: '/smɔːl/', meaning: '小的' },
+    { word: 'big', phonetic: '/bɪɡ/', meaning: '大的' },
+    { word: 'blunt', phonetic: '/blʌnt/', meaning: '钝的' },
+    { word: 'box', phonetic: '/bɒks/', meaning: '盒子' },
+    { word: 'glass', phonetic: '/ɡlɑːs/', meaning: '杯子' },
+    { word: 'cup', phonetic: '/kʌp/', meaning: '茶杯' },
+    { word: 'bottle', phonetic: '/ˈbɒtl/', meaning: '瓶子' },
+    { word: 'tin', phonetic: '/tɪn/', meaning: '罐头' },
+  ]},
+  { lesson: 23, title: '第23-24课: Which glasses?', words: [
+    { word: 'on', phonetic: '/ɒn/', meaning: '在...上面' },
+    { word: 'shelf', phonetic: '/ʃelf/', meaning: '架子' },
+    { word: 'desk', phonetic: '/desk/', meaning: '书桌' },
+    { word: 'table', phonetic: '/ˈteɪbl/', meaning: '桌子' },
+    { word: 'plate', phonetic: '/pleɪt/', meaning: '盘子' },
+    { word: 'cupboard', phonetic: '/ˈkʌbəd/', meaning: '碗柜' },
+    { word: 'cigarette', phonetic: '/ˌsɪɡəˈret/', meaning: '香烟' },
+    { word: 'television', phonetic: '/ˈtelɪvɪʒn/', meaning: '电视' },
+    { word: 'floor', phonetic: '/flɔː/', meaning: '地板' },
+    { word: 'dressing table', phonetic: '/ˈdresɪŋ ˈteɪbl/', meaning: '梳妆台' },
+    { word: 'magazine', phonetic: '/ˌmæɡəˈziːn/', meaning: '杂志' },
+    { word: 'bed', phonetic: '/bed/', meaning: '床' },
+    { word: 'newspaper', phonetic: '/ˈnjuːzpeɪpə/', meaning: '报纸' },
+    { word: 'stereo', phonetic: '/ˈsteriəʊ/', meaning: '音响' },
+  ]},
+  { lesson: 25, title: '第25-26课: Mrs. Smith\'s kitchen', words: [
+    { word: 'kitchen', phonetic: '/ˈkɪtʃɪn/', meaning: '厨房' },
+    { word: 'right', phonetic: '/raɪt/', meaning: '右边' },
+    { word: 'electric', phonetic: '/ɪˈlektrɪk/', meaning: '电动的' },
+    { word: 'left', phonetic: '/left/', meaning: '左边' },
+    { word: 'cooker', phonetic: '/ˈkʊkə/', meaning: '炊具' },
+    { word: 'middle', phonetic: '/ˈmɪdl/', meaning: '中间' },
+    { word: 'room', phonetic: '/ruːm/', meaning: '房间' },
+    { word: 'cup', phonetic: '/kʌp/', meaning: '茶杯' },
+    { word: 'where', phonetic: '/weə/', meaning: '在哪里' },
+    { word: 'in', phonetic: '/ɪn/', meaning: '在...里面' },
+  ]},
+  { lesson: 27, title: '第27-28课: Mrs. Smith\'s living room', words: [
+    { word: 'living room', phonetic: '/ˈlɪvɪŋ ruːm/', meaning: '客厅' },
+    { word: 'near', phonetic: '/nɪə/', meaning: '靠近' },
+    { word: 'window', phonetic: '/ˈwɪndəʊ/', meaning: '窗户' },
+    { word: 'armchair', phonetic: '/ˈɑːmtʃeə/', meaning: '扶手椅' },
+    { word: 'door', phonetic: '/dɔː/', meaning: '门' },
+    { word: 'picture', phonetic: '/ˈpɪktʃə/', meaning: '图画' },
+    { word: 'wall', phonetic: '/wɔːl/', meaning: '墙' },
+    { word: 'trousers', phonetic: '/ˈtraʊzəz/', meaning: '长裤' },
+  ]},
+  { lesson: 29, title: '第29-30课: Come in, Amy', words: [
+    { word: 'shut', phonetic: '/ʃʌt/', meaning: '关上' },
+    { word: 'bedroom', phonetic: '/ˈbedruːm/', meaning: '卧室' },
+    { word: 'untidy', phonetic: '/ʌnˈtaɪdi/', meaning: '不整齐的' },
+    { word: 'put on', phonetic: '/pʊt ɒn/', meaning: '穿上' },
+    { word: 'take off', phonetic: '/teɪk ɒf/', meaning: '脱下' },
+    { word: 'turn on', phonetic: '/tɜːn ɒn/', meaning: '打开' },
+    { word: 'turn off', phonetic: '/tɜːn ɒf/', meaning: '关掉' },
+    { word: 'air', phonetic: '/eə/', meaning: '通风' },
+    { word: 'clothes', phonetic: '/kləʊðz/', meaning: '衣服' },
+    { word: 'dust', phonetic: '/dʌst/', meaning: '掸灰尘' },
+    { word: 'sweep', phonetic: '/swiːp/', meaning: '扫' },
+    { word: 'empty', phonetic: '/ˈempti/', meaning: '倒空' },
+    { word: 'read', phonetic: '/riːd/', meaning: '读' },
+    { word: 'sharpen', phonetic: '/ˈʃɑːpən/', meaning: '削尖' },
+  ]},
+  { lesson: 31, title: '第31-32课: Where\'s Sally?', words: [
+    { word: 'garden', phonetic: '/ˈɡɑːdn/', meaning: '花园' },
+    { word: 'under', phonetic: '/ˈʌndə/', meaning: '在...下面' },
+    { word: 'tree', phonetic: '/triː/', meaning: '树' },
+    { word: 'who', phonetic: '/huː/', meaning: '谁' },
+    { word: 'run', phonetic: '/rʌn/', meaning: '跑' },
+    { word: 'grass', phonetic: '/ɡrɑːs/', meaning: '草' },
+    { word: 'after', phonetic: '/ˈɑːftə/', meaning: '在...之后' },
+    { word: 'cat', phonetic: '/kæt/', meaning: '猫' },
+    { word: 'type', phonetic: '/taɪp/', meaning: '打字' },
+    { word: 'letter', phonetic: '/ˈletə/', meaning: '信' },
+    { word: 'basket', phonetic: '/ˈbɑːskɪt/', meaning: '篮子' },
+    { word: 'eat', phonetic: '/iːt/', meaning: '吃' },
+    { word: 'bone', phonetic: '/bəʊn/', meaning: '骨头' },
+    { word: 'tooth', phonetic: '/tuːθ/', meaning: '牙齿' },
+    { word: 'cook', phonetic: '/kʊk/', meaning: '做饭' },
+    { word: 'milk', phonetic: '/mɪlk/', meaning: '牛奶' },
+    { word: 'meal', phonetic: '/miːl/', meaning: '一顿饭' },
+    { word: 'drink', phonetic: '/drɪŋk/', meaning: '喝' },
+  ]},
+  { lesson: 33, title: '第33-34课: A fine day', words: [
+    { word: 'day', phonetic: '/deɪ/', meaning: '日子' },
+    { word: 'cloud', phonetic: '/klaʊd/', meaning: '云' },
+    { word: 'sky', phonetic: '/skaɪ/', meaning: '天空' },
+    { word: 'sun', phonetic: '/sʌn/', meaning: '太阳' },
+    { word: 'shine', phonetic: '/ʃaɪn/', meaning: '照耀' },
+    { word: 'with', phonetic: '/wɪð/', meaning: '和...一起' },
+    { word: 'family', phonetic: '/ˈfæməli/', meaning: '家庭' },
+    { word: 'walk', phonetic: '/wɔːk/', meaning: '走路' },
+    { word: 'over', phonetic: '/ˈəʊvə/', meaning: '在...上方' },
+    { word: 'bridge', phonetic: '/brɪdʒ/', meaning: '桥' },
+    { word: 'boat', phonetic: '/bəʊt/', meaning: '船' },
+    { word: 'river', phonetic: '/ˈrɪvə/', meaning: '河' },
+    { word: 'ship', phonetic: '/ʃɪp/', meaning: '轮船' },
+    { word: 'aeroplane', phonetic: '/ˈeərəpleɪn/', meaning: '飞机' },
+    { word: 'fly', phonetic: '/flaɪ/', meaning: '飞' },
+  ]},
+  { lesson: 35, title: '第35-36课: Our village', words: [
+    { word: 'photograph', phonetic: '/ˈfəʊtəɡrɑːf/', meaning: '照片' },
+    { word: 'village', phonetic: '/ˈvɪlɪdʒ/', meaning: '村庄' },
+    { word: 'valley', phonetic: '/ˈvæli/', meaning: '山谷' },
+    { word: 'between', phonetic: '/bɪˈtwiːn/', meaning: '在...之间' },
+    { word: 'hill', phonetic: '/hɪl/', meaning: '小山' },
+    { word: 'another', phonetic: '/əˈnʌðə/', meaning: '另一个' },
+    { word: 'wife', phonetic: '/waɪf/', meaning: '妻子' },
+    { word: 'along', phonetic: '/əˈlɒŋ/', meaning: '沿着' },
+    { word: 'bank', phonetic: '/bæŋk/', meaning: '河岸' },
+    { word: 'water', phonetic: '/ˈwɔːtə/', meaning: '水' },
+    { word: 'swim', phonetic: '/swɪm/', meaning: '游泳' },
+    { word: 'building', phonetic: '/ˈbɪldɪŋ/', meaning: '大楼' },
+    { word: 'park', phonetic: '/pɑːk/', meaning: '公园' },
+    { word: 'into', phonetic: '/ˈɪntə/', meaning: '进入' },
+    { word: 'beside', phonetic: '/bɪˈsaɪd/', meaning: '在...旁边' },
+    { word: 'off', phonetic: '/ɒf/', meaning: '离开' },
+  ]},
+  { lesson: 37, title: '第37-38课: Making a bookcase', words: [
+    { word: 'bookcase', phonetic: '/ˈbʊkkeɪs/', meaning: '书柜' },
+    { word: 'hammer', phonetic: '/ˈhæmə/', meaning: '锤子' },
+    { word: 'pink', phonetic: '/pɪŋk/', meaning: '粉色的' },
+    { word: 'favorite', phonetic: '/ˈfeɪvərɪt/', meaning: '最喜欢的' },
+    { word: 'work', phonetic: '/wɜːk/', meaning: '工作' },
+    { word: 'hard', phonetic: '/hɑːd/', meaning: '努力地' },
+    { word: 'make', phonetic: '/meɪk/', meaning: '做' },
+    { word: 'paint', phonetic: '/peɪnt/', meaning: '刷漆' },
+    { word: 'pink', phonetic: '/pɪŋk/', meaning: '粉色的' },
+    { word: 'homework', phonetic: '/ˈhəʊmwɜːk/', meaning: '作业' },
+    { word: 'listen', phonetic: '/ˈlɪsn/', meaning: '听' },
+    { word: 'dish', phonetic: '/dɪʃ/', meaning: '盘子' },
+  ]},
+  { lesson: 39, title: '第39-40课: Don\'t drop it!', words: [
+    { word: 'front', phonetic: '/frʌnt/', meaning: '前面' },
+    { word: 'careful', phonetic: '/ˈkeəfl/', meaning: '小心的' },
+    { word: 'vase', phonetic: '/vɑːz/', meaning: '花瓶' },
+    { word: 'drop', phonetic: '/drɒp/', meaning: '掉落' },
+    { word: 'flower', phonetic: '/ˈflaʊə/', meaning: '花' },
+    { word: 'show', phonetic: '/ʃəʊ/', meaning: '给...看' },
+    { word: 'take', phonetic: '/teɪk/', meaning: '拿' },
+    { word: 'send', phonetic: '/send/', meaning: '送给' },
+    { word: 'give', phonetic: '/ɡɪv/', meaning: '给' },
+    { word: 'cheese', phonetic: '/tʃiːz/', meaning: '奶酪' },
+    { word: 'bread', phonetic: '/bred/', meaning: '面包' },
+    { word: 'soap', phonetic: '/səʊp/', meaning: '肥皂' },
+    { word: 'chocolate', phonetic: '/ˈtʃɒklət/', meaning: '巧克力' },
+    { word: 'sugar', phonetic: '/ˈʃʊɡə/', meaning: '糖' },
+    { word: 'coffee', phonetic: '/ˈkɒfi/', meaning: '咖啡' },
+    { word: 'tea', phonetic: '/tiː/', meaning: '茶' },
+  ]},
+  { lesson: 41, title: '第41-42课: Penny\'s bag', words: [
+    { word: 'bag', phonetic: '/bæɡ/', meaning: '包' },
+    { word: 'cheese', phonetic: '/tʃiːz/', meaning: '奶酪' },
+    { word: 'bread', phonetic: '/bred/', meaning: '面包' },
+    { word: 'soap', phonetic: '/səʊp/', meaning: '肥皂' },
+    { word: 'chocolate', phonetic: '/ˈtʃɒklət/', meaning: '巧克力' },
+    { word: 'sugar', phonetic: '/ˈʃʊɡə/', meaning: '糖' },
+    { word: 'coffee', phonetic: '/ˈkɒfi/', meaning: '咖啡' },
+    { word: 'tea', phonetic: '/tiː/', meaning: '茶' },
+    { word: 'tobacco', phonetic: '/təˈbækəʊ/', meaning: '烟草' },
+    { word: 'piece', phonetic: '/piːs/', meaning: '块' },
+    { word: 'bar', phonetic: '/bɑː/', meaning: '条' },
+    { word: 'bottle', phonetic: '/ˈbɒtl/', meaning: '瓶' },
+    { word: 'pound', phonetic: '/paʊnd/', meaning: '磅' },
+    { word: 'quarter', phonetic: '/ˈkwɔːtə/', meaning: '四分之一' },
+    { word: 'tin', phonetic: '/tɪn/', meaning: '罐头' },
+  ]},
+  { lesson: 43, title: '第43-44课: Hurry up!', words: [
+    { word: 'boil', phonetic: '/bɔɪl/', meaning: '沸腾' },
+    { word: 'kettle', phonetic: '/ˈketl/', meaning: '水壶' },
+    { word: 'behind', phonetic: '/bɪˈhaɪnd/', meaning: '在...后面' },
+    { word: 'teapot', phonetic: '/ˈtiːpɒt/', meaning: '茶壶' },
+    { word: 'now', phonetic: '/naʊ/', meaning: '现在' },
+    { word: 'find', phonetic: '/faɪnd/', meaning: '找到' },
+    { word: 'hurry', phonetic: '/ˈhʌri/', meaning: '赶快' },
+    { word: 'cup', phonetic: '/kʌp/', meaning: '茶杯' },
+    { word: 'tea', phonetic: '/tiː/', meaning: '茶' },
+    { word: 'biscuit', phonetic: '/ˈbɪskɪt/', meaning: '饼干' },
+  ]},
+  { lesson: 45, title: '第45-46课: The boss\'s letter', words: [
+    { word: 'can', phonetic: '/kæn/', meaning: '能' },
+    { word: 'boss', phonetic: '/bɒs/', meaning: '老板' },
+    { word: 'minute', phonetic: '/ˈmɪnɪt/', meaning: '分钟' },
+    { word: 'ask', phonetic: '/ɑːsk/', meaning: '问' },
+    { word: 'handwriting', phonetic: '/ˈhændraɪtɪŋ/', meaning: '书写' },
+    { word: 'terrible', phonetic: '/ˈterəbl/', meaning: '糟糕的' },
+    { word: 'lift', phonetic: '/lɪft/', meaning: '举起' },
+    { word: 'cake', phonetic: '/keɪk/', meaning: '蛋糕' },
+    { word: 'biscuit', phonetic: '/ˈbɪskɪt/', meaning: '饼干' },
+  ]},
+  { lesson: 47, title: '第47-48课: A cup of coffee', words: [
+    { word: 'like', phonetic: '/laɪk/', meaning: '喜欢' },
+    { word: 'want', phonetic: '/wɒnt/', meaning: '想要' },
+    { word: 'fresh', phonetic: '/freʃ/', meaning: '新鲜的' },
+    { word: 'egg', phonetic: '/eɡ/', meaning: '鸡蛋' },
+    { word: 'butter', phonetic: '/ˈbʌtə/', meaning: '黄油' },
+    { word: 'pure', phonetic: '/pjʊə/', meaning: '纯净的' },
+    { word: 'honey', phonetic: '/ˈhʌni/', meaning: '蜂蜜' },
+    { word: 'ripe', phonetic: '/raɪp/', meaning: '熟的' },
+    { word: 'banana', phonetic: '/bəˈnɑːnə/', meaning: '香蕉' },
+    { word: 'jam', phonetic: '/dʒæm/', meaning: '果酱' },
+    { word: 'sweet', phonetic: '/swiːt/', meaning: '甜的' },
+    { word: 'orange', phonetic: '/ˈɒrɪndʒ/', meaning: '橙子' },
+    { word: 'whisky', phonetic: '/ˈwɪski/', meaning: '威士忌' },
+    { word: 'apple', phonetic: '/ˈæpl/', meaning: '苹果' },
+    { word: 'choice', phonetic: '/tʃɔɪs/', meaning: '选择' },
+  ]},
+  { lesson: 49, title: '第49-50课: At the butcher\'s', words: [
+    { word: 'butcher', phonetic: '/ˈbʊtʃə/', meaning: '卖肉的' },
+    { word: 'meat', phonetic: '/miːt/', meaning: '肉' },
+    { word: 'beef', phonetic: '/biːf/', meaning: '牛肉' },
+    { word: 'mince', phonetic: '/mɪns/', meaning: '肉馅' },
+    { word: 'chicken', phonetic: '/ˈtʃɪkɪn/', meaning: '鸡' },
+    { word: 'truth', phonetic: '/truːθ/', meaning: '真相' },
+    { word: 'either', phonetic: '/ˈaɪðə/', meaning: '也(否定)' },
+    { word: 'tomato', phonetic: '/təˈmɑːtəʊ/', meaning: '西红柿' },
+    { word: 'potato', phonetic: '/pəˈteɪtəʊ/', meaning: '土豆' },
+    { word: 'cabbage', phonetic: '/ˈkæbɪdʒ/', meaning: '卷心菜' },
+    { word: 'lettuce', phonetic: '/ˈletɪs/', meaning: '生菜' },
+    { word: 'pea', phonetic: '/piː/', meaning: '豌豆' },
+    { word: 'bean', phonetic: '/biːn/', meaning: '豆子' },
+    { word: 'pear', phonetic: '/peə/', meaning: '梨' },
+    { word: 'peach', phonetic: '/piːtʃ/', meaning: '桃子' },
+    { word: 'grape', phonetic: '/ɡreɪp/', meaning: '葡萄' },
+  ]},
+  { lesson: 51, title: '第51-52课: A pleasant climate', words: [
+    { word: 'Greece', phonetic: '/ɡriːs/', meaning: '希腊' },
+    { word: 'climate', phonetic: '/ˈklaɪmət/', meaning: '气候' },
+    { word: 'country', phonetic: '/ˈkʌntri/', meaning: '国家' },
+    { word: 'pleasant', phonetic: '/ˈpleznt/', meaning: '宜人的' },
+    { word: 'weather', phonetic: '/ˈweðə/', meaning: '天气' },
+    { word: 'spring', phonetic: '/sprɪŋ/', meaning: '春天' },
+    { word: 'windy', phonetic: '/ˈwɪndi/', meaning: '有风的' },
+    { word: 'warm', phonetic: '/wɔːm/', meaning: '温暖的' },
+    { word: 'rain', phonetic: '/reɪn/', meaning: '下雨' },
+    { word: 'summer', phonetic: '/ˈsʌmə/', meaning: '夏天' },
+    { word: 'autumn', phonetic: '/ˈɔːtəm/', meaning: '秋天' },
+    { word: 'winter', phonetic: '/ˈwɪntə/', meaning: '冬天' },
+    { word: 'snow', phonetic: '/snəʊ/', meaning: '下雪' },
+    { word: 'January', phonetic: '/ˈdʒænjuəri/', meaning: '一月' },
+    { word: 'February', phonetic: '/ˈfebruəri/', meaning: '二月' },
+    { word: 'March', phonetic: '/mɑːtʃ/', meaning: '三月' },
+    { word: 'April', phonetic: '/ˈeɪprəl/', meaning: '四月' },
+    { word: 'May', phonetic: '/meɪ/', meaning: '五月' },
+    { word: 'June', phonetic: '/dʒuːn/', meaning: '六月' },
+    { word: 'July', phonetic: '/dʒuˈlaɪ/', meaning: '七月' },
+    { word: 'August', phonetic: '/ˈɔːɡəst/', meaning: '八月' },
+    { word: 'September', phonetic: '/sepˈtembə/', meaning: '九月' },
+    { word: 'October', phonetic: '/ɒkˈtəʊbə/', meaning: '十月' },
+    { word: 'November', phonetic: '/nəʊˈvembə/', meaning: '十一月' },
+    { word: 'December', phonetic: '/dɪˈsembə/', meaning: '十二月' },
+  ]},
+  { lesson: 53, title: '第53-54课: An interesting climate', words: [
+    { word: 'conversation', phonetic: '/ˌkɒnvəˈseɪʃən/', meaning: '谈话' },
+    { word: 'interesting', phonetic: '/ˈɪntrəstɪŋ/', meaning: '有趣的' },
+    { word: 'Australia', phonetic: '/ɒˈstreɪliə/', meaning: '澳大利亚' },
+    { word: 'Australian', phonetic: '/ɒˈstreɪliən/', meaning: '澳大利亚的' },
+    { word: 'Canada', phonetic: '/ˈkænədə/', meaning: '加拿大' },
+    { word: 'Canadian', phonetic: '/kəˈneɪdiən/', meaning: '加拿大的' },
+    { word: 'India', phonetic: '/ˈɪndiə/', meaning: '印度' },
+    { word: 'Indian', phonetic: '/ˈɪndiən/', meaning: '印度的' },
+    { word: 'Britain', phonetic: '/ˈbrɪtn/', meaning: '英国' },
+    { word: 'west', phonetic: '/west/', meaning: '西方' },
+    { word: 'east', phonetic: '/iːst/', meaning: '东方' },
+    { word: 'north', phonetic: '/nɔːθ/', meaning: '北方' },
+    { word: 'south', phonetic: '/saʊθ/', meaning: '南方' },
+  ]},
+  { lesson: 55, title: '第55-56课: The Sawyer family', words: [
+    { word: 'live', phonetic: '/lɪv/', meaning: '居住' },
+    { word: 'street', phonetic: '/striːt/', meaning: '街道' },
+    { word: 'morning', phonetic: '/ˈmɔːnɪŋ/', meaning: '早上' },
+    { word: 'stay', phonetic: '/steɪ/', meaning: '待在' },
+    { word: 'house', phonetic: '/haʊs/', meaning: '房子' },
+    { word: 'noon', phonetic: '/nuːn/', meaning: '中午' },
+    { word: 'usually', phonetic: '/ˈjuːʒuəli/', meaning: '通常' },
+    { word: 'together', phonetic: '/təˈɡeðə/', meaning: '一起' },
+    { word: 'evening', phonetic: '/ˈiːvnɪŋ/', meaning: '傍晚' },
+    { word: 'arrive', phonetic: '/əˈraɪv/', meaning: '到达' },
+    { word: 'home', phonetic: '/həʊm/', meaning: '家' },
+    { word: 'night', phonetic: '/naɪt/', meaning: '夜里' },
+    { word: 'sometimes', phonetic: '/ˈsʌmtaɪmz/', meaning: '有时' },
+    { word: 'homework', phonetic: '/ˈhəʊmwɜːk/', meaning: '作业' },
+  ]},
+  { lesson: 57, title: '第57-58课: An unusual day', words: [
+    { word: "o'clock", phonetic: '/əˈklɒk/', meaning: '点钟' },
+    { word: 'shop', phonetic: '/ʃɒp/', meaning: '商店' },
+    { word: 'moment', phonetic: '/ˈməʊmənt/', meaning: '片刻' },
+    { word: 'usually', phonetic: '/ˈjuːʒuəli/', meaning: '通常' },
+    { word: 'today', phonetic: '/təˈdeɪ/', meaning: '今天' },
+    { word: 'by car', phonetic: '/baɪ kɑː/', meaning: '坐汽车' },
+    { word: 'on foot', phonetic: '/ɒn fʊt/', meaning: '步行' },
+    { word: 'stay', phonetic: '/steɪ/', meaning: '待在' },
+    { word: 'drink', phonetic: '/drɪŋk/', meaning: '喝' },
+    { word: 'together', phonetic: '/təˈɡeðə/', meaning: '一起' },
+  ]},
+  { lesson: 59, title: '第59-60课: Is that all?', words: [
+    { word: 'envelope', phonetic: '/ˈenvələʊp/', meaning: '信封' },
+    { word: 'writing paper', phonetic: '/ˈraɪtɪŋ peɪpə/', meaning: '信纸' },
+    { word: 'shop assistant', phonetic: '/ʃɒp əˈsɪstənt/', meaning: '店员' },
+    { word: 'size', phonetic: '/saɪz/', meaning: '尺寸' },
+    { word: 'pad', phonetic: '/pæd/', meaning: '便笺簿' },
+    { word: 'glue', phonetic: '/ɡluː/', meaning: '胶水' },
+    { word: 'chalk', phonetic: '/tʃɔːk/', meaning: '粉笔' },
+    { word: 'change', phonetic: '/tʃeɪndʒ/', meaning: '零钱' },
+    { word: 'blue', phonetic: '/bluː/', meaning: '蓝色的' },
+    { word: 'black', phonetic: '/blæk/', meaning: '黑色的' },
+  ]},
+  { lesson: 61, title: '第61-62课: A bad cold', words: [
+    { word: 'feel', phonetic: '/fiːl/', meaning: '感觉' },
+    { word: 'look', phonetic: '/lʊk/', meaning: '看起来' },
+    { word: 'must', phonetic: '/mʌst/', meaning: '必须' },
+    { word: 'call', phonetic: '/kɔːl/', meaning: '叫' },
+    { word: 'doctor', phonetic: '/ˈdɒktə/', meaning: '医生' },
+    { word: 'remember', phonetic: '/rɪˈmembə/', meaning: '记得' },
+    { word: 'tongue', phonetic: '/tʌŋ/', meaning: '舌头' },
+    { word: 'show', phonetic: '/ʃəʊ/', meaning: '给...看' },
+    { word: 'mouth', phonetic: '/maʊθ/', meaning: '嘴' },
+    { word: 'bad', phonetic: '/bæd/', meaning: '坏的' },
+    { word: 'cold', phonetic: '/kəʊld/', meaning: '感冒' },
+    { word: 'news', phonetic: '/njuːz/', meaning: '消息' },
+    { word: 'headache', phonetic: '/ˈhedeɪk/', meaning: '头痛' },
+    { word: 'aspirin', phonetic: '/ˈæsprɪn/', meaning: '阿司匹林' },
+    { word: 'earache', phonetic: '/ˈɪəreɪk/', meaning: '耳痛' },
+    { word: 'toothache', phonetic: '/ˈtuːθeɪk/', meaning: '牙痛' },
+    { word: 'stomach ache', phonetic: '/ˈstʌmək eɪk/', meaning: '胃痛' },
+    { word: 'temperature', phonetic: '/ˈtemprətʃə/', meaning: '体温' },
+    { word: 'flu', phonetic: '/fluː/', meaning: '流感' },
+    { word: 'measles', phonetic: '/ˈmiːzlz/', meaning: '麻疹' },
+    { word: 'mumps', phonetic: '/mʌmps/', meaning: '腮腺炎' },
+  ]},
+  { lesson: 63, title: '第63-64课: Thank you, doctor', words: [
+    { word: 'better', phonetic: '/ˈbetə/', meaning: '好些了' },
+    { word: 'certainly', phonetic: '/ˈsɜːtnli/', meaning: '当然' },
+    { word: 'get up', phonetic: '/ɡet ʌp/', meaning: '起床' },
+    { word: 'yet', phonetic: '/jet/', meaning: '还' },
+    { word: 'rich', phonetic: '/rɪtʃ/', meaning: '油腻的' },
+    { word: 'food', phonetic: '/fuːd/', meaning: '食物' },
+    { word: 'remain', phonetic: '/rɪˈmeɪn/', meaning: '保持' },
+    { word: 'play', phonetic: '/pleɪ/', meaning: '玩' },
+    { word: 'match', phonetic: '/mætʃ/', meaning: '比赛' },
+    { word: 'library', phonetic: '/ˈlaɪbrəri/', meaning: '图书馆' },
+    { word: 'drive', phonetic: '/draɪv/', meaning: '开车' },
+    { word: 'so', phonetic: '/səʊ/', meaning: '如此地' },
+    { word: 'quickly', phonetic: '/ˈkwɪkli/', meaning: '快地' },
+    { word: 'lean out of', phonetic: '/liːn aʊt əv/', meaning: '探出' },
+    { word: 'break', phonetic: '/breɪk/', meaning: '打破' },
+  ]},
+  { lesson: 65, title: '第65-66课: Not a baby', words: [
+    { word: 'absent', phonetic: '/ˈæbsənt/', meaning: '缺席的' },
+    { word: 'keep', phonetic: '/kiːp/', meaning: '保持' },
+    { word: 'spend', phonetic: '/spend/', meaning: '度过' },
+    { word: 'holiday', phonetic: '/ˈhɒlədeɪ/', meaning: '假日' },
+    { word: 'country', phonetic: '/ˈkʌntri/', meaning: '乡下' },
+    { word: 'lucky', phonetic: '/ˈlʌki/', meaning: '幸运的' },
+    { word: 'well', phonetic: '/wel/', meaning: '好吧' },
+    { word: 'key', phonetic: '/kiː/', meaning: '钥匙' },
+    { word: 'baby', phonetic: '/ˈbeɪbi/', meaning: '婴儿' },
+    { word: 'hear', phonetic: '/hɪə/', meaning: '听见' },
+    { word: 'enjoy', phonetic: '/ɪnˈdʒɔɪ/', meaning: '享受' },
+    { word: 'yourself', phonetic: '/jɔːˈself/', meaning: '你自己' },
+    { word: 'mum', phonetic: '/mʌm/', meaning: '妈妈' },
+  ]},
+  { lesson: 67, title: '第67-68课: The weekend', words: [
+    { word: 'weekend', phonetic: '/ˌwiːkˈend/', meaning: '周末' },
+    { word: 'Friday', phonetic: '/ˈfraɪdeɪ/', meaning: '星期五' },
+    { word: 'Saturday', phonetic: '/ˈsætədeɪ/', meaning: '星期六' },
+    { word: 'Sunday', phonetic: '/ˈsʌndeɪ/', meaning: '星期日' },
+    { word: 'country', phonetic: '/ˈkʌntri/', meaning: '乡下' },
+    { word: 'luck', phonetic: '/lʌk/', meaning: '运气' },
+    { word: 'church', phonetic: '/tʃɜːtʃ/', meaning: '教堂' },
+    { word: 'dairy', phonetic: '/ˈdeəri/', meaning: '乳品店' },
+    { word: 'Monday', phonetic: '/ˈmʌndeɪ/', meaning: '星期一' },
+    { word: 'Tuesday', phonetic: '/ˈtjuːzdeɪ/', meaning: '星期二' },
+    { word: 'Wednesday', phonetic: '/ˈwenzdeɪ/', meaning: '星期三' },
+    { word: 'Thursday', phonetic: '/ˈθɜːzdeɪ/', meaning: '星期四' },
+    { word: 'stay', phonetic: '/steɪ/', meaning: '待在' },
+  ]},
+  { lesson: 69, title: '第69-70课: The car race', words: [
+    { word: 'year', phonetic: '/jɪə/', meaning: '年' },
+    { word: 'race', phonetic: '/reɪs/', meaning: '比赛' },
+    { word: 'town', phonetic: '/taʊn/', meaning: '城镇' },
+    { word: 'crowd', phonetic: '/kraʊd/', meaning: '人群' },
+    { word: 'stand', phonetic: '/stænd/', meaning: '站立' },
+    { word: 'exciting', phonetic: '/ɪkˈsaɪtɪŋ/', meaning: '令人激动的' },
+    { word: 'finish', phonetic: '/ˈfɪnɪʃ/', meaning: '结束' },
+    { word: 'winner', phonetic: '/ˈwɪnə/', meaning: '获胜者' },
+    { word: 'way', phonetic: '/weɪ/', meaning: '路途' },
+    { word: 'just', phonetic: '/dʒʌst/', meaning: '正好' },
+    { word: 'driver', phonetic: '/ˈdraɪvə/', meaning: '司机' },
+    { word: 'engine', phonetic: '/ˈendʒɪn/', meaning: '发动机' },
+    { word: 'expensive', phonetic: '/ɪkˈspensɪv/', meaning: '昂贵的' },
+    { word: 'cheap', phonetic: '/tʃiːp/', meaning: '便宜的' },
+  ]},
+  { lesson: 71, title: '第71-72课: He\'s awful!', words: [
+    { word: 'phone', phonetic: '/fəʊn/', meaning: '打电话' },
+    { word: 'again', phonetic: '/əˈɡen/', meaning: '又' },
+    { word: 'say', phonetic: '/seɪ/', meaning: '说' },
+    { word: 'awful', phonetic: '/ˈɔːfl/', meaning: '糟糕的' },
+    { word: 'answer', phonetic: '/ˈɑːnsə/', meaning: '回答' },
+    { word: 'time', phonetic: '/taɪm/', meaning: '次' },
+    { word: 'last', phonetic: '/lɑːst/', meaning: '最后的' },
+    { word: 'phone', phonetic: '/fəʊn/', meaning: '电话' },
+    { word: 'ago', phonetic: '/əˈɡəʊ/', meaning: '以前' },
+    { word: 'appointment', phonetic: '/əˈpɔɪntmənt/', meaning: '预约' },
+    { word: 'urgent', phonetic: '/ˈɜːdʒənt/', meaning: '紧急的' },
+    { word: 'until', phonetic: '/ənˈtɪl/', meaning: '直到' },
+  ]},
+  { lesson: 73, title: '第73-74课: The way to King Street', words: [
+    { word: 'way', phonetic: '/weɪ/', meaning: '路线' },
+    { word: 'know', phonetic: '/nəʊ/', meaning: '知道' },
+    { word: 'understand', phonetic: '/ˌʌndəˈstænd/', meaning: '明白' },
+    { word: 'hand', phonetic: '/hænd/', meaning: '手' },
+    { word: 'pocket', phonetic: '/ˈpɒkɪt/', meaning: '口袋' },
+    { word: 'phrasebook', phonetic: '/ˈfreɪzbʊk/', meaning: '短语手册' },
+    { word: 'phrase', phonetic: '/freɪz/', meaning: '短语' },
+    { word: 'slowly', phonetic: '/ˈsləʊli/', meaning: '慢慢地' },
+    { word: 'smile', phonetic: '/smaɪl/', meaning: '微笑' },
+    { word: 'pleasant', phonetic: '/ˈpleznt/', meaning: '愉快的' },
+    { word: 'suddenly', phonetic: '/ˈsʌdənli/', meaning: '突然地' },
+    { word: 'cut', phonetic: '/kʌt/', meaning: '割' },
+    { word: 'thirsty', phonetic: '/ˈθɜːsti/', meaning: '口渴的' },
+  ]},
+  { lesson: 75, title: '第75-76课: Uncomfortable shoes', words: [
+    { word: 'uncomfortable', phonetic: '/ʌnˈkʌmftəbl/', meaning: '不舒服的' },
+    { word: 'shoes', phonetic: '/ʃuːz/', meaning: '鞋子' },
+    { word: 'wear', phonetic: '/weə/', meaning: '穿着' },
+    { word: 'ago', phonetic: '/əˈɡəʊ/', meaning: '以前' },
+    { word: 'buy', phonetic: '/baɪ/', meaning: '买' },
+    { word: 'pair', phonetic: '/peə/', meaning: '双' },
+    { word: 'fashion', phonetic: '/ˈfæʃən/', meaning: '时尚' },
+    { word: 'uncomfortable', phonetic: '/ʌnˈkʌmftəbl/', meaning: '不舒服的' },
+    { word: 'style', phonetic: '/staɪl/', meaning: '款式' },
+    { word: 'pretty', phonetic: '/ˈprɪti/', meaning: '漂亮的' },
+    { word: 'tight', phonetic: '/taɪt/', meaning: '紧的' },
+  ]},
+  { lesson: 77, title: '第77-78课: Terrible toothache', words: [
+    { word: 'appointment', phonetic: '/əˈpɔɪntmənt/', meaning: '预约' },
+    { word: 'toothache', phonetic: '/ˈtuːθeɪk/', meaning: '牙痛' },
+    { word: 'dentist', phonetic: '/ˈdentɪst/', meaning: '牙医' },
+    { word: 'urgent', phonetic: '/ˈɜːdʒənt/', meaning: '紧急的' },
+    { word: 'see', phonetic: '/siː/', meaning: '看' },
+    { word: 'terrible', phonetic: '/ˈterəbl/', meaning: '糟糕的' },
+    { word: 'at the moment', phonetic: '/ət ðə ˈməʊmənt/', meaning: '此刻' },
+    { word: 'ready', phonetic: '/ˈredi/', meaning: '准备好的' },
+    { word: 'right', phonetic: '/raɪt/', meaning: '右边的' },
+    { word: 'cancel', phonetic: '/ˈkænsl/', meaning: '取消' },
+    { word: 'at last', phonetic: '/ət lɑːst/', meaning: '终于' },
+    { word: 'cancel', phonetic: '/ˈkænsl/', meaning: '取消' },
+  ]},
+  { lesson: 79, title: '第79-80课: Carol\'s shopping list', words: [
+    { word: 'shopping', phonetic: '/ˈʃɒpɪŋ/', meaning: '购物' },
+    { word: 'list', phonetic: '/lɪst/', meaning: '清单' },
+    { word: 'vegetable', phonetic: '/ˈvedʒtəbl/', meaning: '蔬菜' },
+    { word: 'need', phonetic: '/niːd/', meaning: '需要' },
+    { word: 'hope', phonetic: '/həʊp/', meaning: '希望' },
+    { word: 'thing', phonetic: '/θɪŋ/', meaning: '东西' },
+    { word: 'money', phonetic: '/ˈmʌni/', meaning: '钱' },
+    { word: 'groceries', phonetic: '/ˈɡrəʊsəriz/', meaning: '食品杂货' },
+    { word: 'stationery', phonetic: '/ˈsteɪʃənri/', meaning: '文具' },
+    { word: 'newsagent', phonetic: '/ˈnjuːzeɪdʒənt/', meaning: '报刊经销商' },
+    { word: 'chemist', phonetic: '/ˈkemɪst/', meaning: '药店' },
+    { word: 'bread', phonetic: '/bred/', meaning: '面包' },
+    { word: 'cheese', phonetic: '/tʃiːz/', meaning: '奶酪' },
+    { word: 'eggs', phonetic: '/eɡz/', meaning: '鸡蛋' },
+    { word: 'potatoes', phonetic: '/pəˈteɪtəʊz/', meaning: '土豆' },
+    { word: 'tomatoes', phonetic: '/təˈmɑːtəʊz/', meaning: '西红柿' },
+  ]},
+];
+
 /* ====== 单词卡 ====== */
 const WordCards = {
   index: 0,
   flipped: false,
+  lessonIdx: 0,
 
   init() {
     document.getElementById('wordPrev').addEventListener('click', () => this.prev());
     document.getElementById('wordNext').addEventListener('click', () => this.next());
     document.getElementById('wordFlip').addEventListener('click', () => this.flip());
+    document.getElementById('wordLessonPrev').addEventListener('click', () => this.prevLesson());
+    document.getElementById('wordLessonNext').addEventListener('click', () => this.nextLesson());
+    // 恢复上次课次
+    if (DB.nce1Lesson && DB.nce1Lesson < NCE1_VOCAB.length) {
+      this.lessonIdx = DB.nce1Lesson;
+    }
+    this.index = 0;
     this.show();
   },
 
+  getCurrentWords() {
+    const lesson = NCE1_VOCAB[this.lessonIdx];
+    return lesson ? lesson.words : [];
+  },
+
+  updateLessonInfo() {
+    const lesson = NCE1_VOCAB[this.lessonIdx];
+    if (lesson) {
+      document.getElementById('wordLessonInfo').textContent = lesson.title;
+    }
+  },
+
+  prevLesson() {
+    if (this.lessonIdx > 0) {
+      this.lessonIdx--;
+      DB.nce1Lesson = this.lessonIdx;
+      saveDB();
+      this.index = 0;
+      this.show();
+      this.updateLessonInfo();
+    }
+  },
+
+  nextLesson() {
+    if (this.lessonIdx < NCE1_VOCAB.length - 1) {
+      this.lessonIdx++;
+      DB.nce1Lesson = this.lessonIdx;
+      saveDB();
+      this.index = 0;
+      this.show();
+      this.updateLessonInfo();
+    }
+  },
+
   show() {
-    if (DB.wordCards.length === 0) {
-      document.getElementById('wordCardWord').textContent = '暂无单词卡';
+    const words = this.getCurrentWords();
+    if (words.length === 0) {
+      document.getElementById('wordCardWord').textContent = '暂无单词';
+      document.getElementById('wordCardPhonetic').textContent = '';
       document.getElementById('wordCardMeaning').textContent = '';
       return;
     }
-    if (this.index >= DB.wordCards.length) this.index = 0;
-    if (this.index < 0) this.index = DB.wordCards.length - 1;
-    const card = DB.wordCards[this.index];
+    if (this.index >= words.length) this.index = 0;
+    if (this.index < 0) this.index = words.length - 1;
+    const card = words[this.index];
     this.flipped = false;
-    // 使用 textContent 而非 innerHTML
     document.getElementById('wordCardWord').textContent = card.word;
+    document.getElementById('wordCardPhonetic').textContent = card.phonetic || '';
     document.getElementById('wordCardMeaning').textContent = '';
     // 语音朗读英文单词
     speak(card.word, 'en-US');
+    this.updateLessonInfo();
   },
 
   flip() {
-    if (DB.wordCards.length === 0) return;
-    const card = DB.wordCards[this.index];
+    const words = this.getCurrentWords();
+    if (words.length === 0) return;
+    const card = words[this.index];
     this.flipped = !this.flipped;
-    document.getElementById('wordCardWord').textContent = this.flipped ? card.meaning : card.word;
-    document.getElementById('wordCardMeaning').textContent = this.flipped ? card.word : '';
-    // 翻转时语音朗读：正面念中文，反面念英文
     if (this.flipped) {
+      document.getElementById('wordCardWord').textContent = card.meaning;
+      document.getElementById('wordCardPhonetic').textContent = card.word;
+      document.getElementById('wordCardMeaning').textContent = '';
       speak(card.meaning, 'zh-CN');
     } else {
+      document.getElementById('wordCardWord').textContent = card.word;
+      document.getElementById('wordCardPhonetic').textContent = card.phonetic || '';
+      document.getElementById('wordCardMeaning').textContent = '';
       speak(card.word, 'en-US');
     }
   },
@@ -3154,6 +3899,51 @@ const FunPark = {
   }
 };
 
+/* ====== 进入密码锁 ====== */
+const APP_PASSWORD = '0328';
+const LOCK_KEY = 'duomi_unlocked';
+
+function initAppLock() {
+  // 同一浏览器会话内已解锁，不再弹锁
+  if (sessionStorage.getItem(LOCK_KEY) === 'yes') {
+    hideLock();
+    init();
+    return;
+  }
+
+  var lock = document.getElementById('appLock');
+  var input = document.getElementById('lockInput');
+  var btn = document.getElementById('lockBtn');
+  var err = document.getElementById('lockError');
+
+  lock.style.display = 'flex';
+  setTimeout(function() { input.focus(); }, 100);
+
+  function tryUnlock() {
+    if (input.value === APP_PASSWORD) {
+      err.textContent = '';
+      sessionStorage.setItem(LOCK_KEY, 'yes');
+      hideLock();
+      init();
+    } else {
+      err.textContent = '密码错误，再试一次';
+      input.value = '';
+      input.classList.add('shake');
+      setTimeout(function() { input.classList.remove('shake'); }, 400);
+    }
+  }
+
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') tryUnlock();
+  });
+}
+
+function hideLock() {
+  var lock = document.getElementById('appLock');
+  if (lock) lock.style.display = 'none';
+}
+
 /* ====== 初始化 ====== */
 function init() {
   loadDB();
@@ -3175,4 +3965,4 @@ function init() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', initAppLock);
