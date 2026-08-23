@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <title>多米工作台</title>
-<link rel="stylesheet" href="css/style.css?v=40">
+<link rel="stylesheet" href="css/style.css?v=42">
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5b8c3a">
@@ -163,9 +163,16 @@ if ('serviceWorker' in navigator) {
         <h3>📖 单词卡</h3>
         <button class="close-panel" data-close="words" aria-label="关闭单词卡">✕</button>
       </div>
+      <!-- 课次选择 -->
+      <div class="word-lesson-bar">
+        <button class="word-lesson-nav" id="wordLessonPrev" aria-label="上一课">◀</button>
+        <div class="word-lesson-info" id="wordLessonInfo">新概念1 · 第1课</div>
+        <button class="word-lesson-nav" id="wordLessonNext" aria-label="下一课">▶</button>
+      </div>
       <div class="word-card-area">
         <div class="word-card" id="wordCard">
           <div class="word-card-word" id="wordCardWord">点击下方按钮开始</div>
+          <div class="word-card-phonetic" id="wordCardPhonetic"></div>
           <div class="word-card-meaning" id="wordCardMeaning"></div>
         </div>
         <div class="word-card-controls">
@@ -519,7 +526,7 @@ if ('serviceWorker' in navigator) {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase.js"></script>
-<script src="js/app.js?v=40"></script>
+<script src="js/app.js?v=41"></script>
 <script>
   // Service Worker 注册（暂时注释掉，先排除 SW 缓存干扰）
   // if ('serviceWorker' in navigator) {
@@ -532,5 +539,18 @@ if ('serviceWorker' in navigator) {
   //   });
   // }
 </script>
+
+<!-- ====== 进入密码锁 ====== -->
+<div id="appLock" class="app-lock-overlay">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">多米工作台</div>
+    <div class="lock-sub">请输入密码进入</div>
+    <input type="password" id="lockInput" class="lock-input" placeholder="密码" inputmode="numeric" maxlength="6" autocomplete="off">
+    <button id="lockBtn" class="lock-btn">进入</button>
+    <div id="lockError" class="lock-error"></div>
+  </div>
+</div>
+
 </body>
 </html>
