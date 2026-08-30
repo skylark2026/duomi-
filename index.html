@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
 <title>多米工作台</title>
-<link rel="stylesheet" href="css/style.css?v=42">
+<link rel="stylesheet" href="css/style.css?v=46">
 <!-- PWA -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5b8c3a">
@@ -63,6 +63,9 @@ if ('serviceWorker' in navigator) {
       <button class="view-toggle-btn" data-view="week">📆 本周</button>
     </div>
 
+    <!-- 课程表图片（本学期） -->
+    <div id="scheduleImageArea"></div>
+
     <!-- 今日视图 -->
     <div id="view-today" class="view-section active">
       <div class="card-section">
@@ -94,6 +97,7 @@ if ('serviceWorker' in navigator) {
       <h2>✅ 打卡任务</h2>
       <p class="page-subtitle">完成任务获得绿宝石奖励！</p>
     </div>
+    <div id="subjectProgressArea" class="subject-progress-area"></div>
     <div id="taskList" class="task-list"></div>
   </section>
 
@@ -109,6 +113,9 @@ if ('serviceWorker' in navigator) {
       <button class="tool-card" data-tool="words" aria-label="单词卡">📖<span>单词卡</span></button>
       <button class="tool-card" data-tool="memo" aria-label="备忘录">📝<span>备忘录</span></button>
       <button class="tool-card" data-tool="math" aria-label="数学练习">🔢<span>数学练习</span></button>
+      <button class="tool-card" data-tool="mistakes" data-school-only="1" aria-label="错题本">📷<span>错题本</span></button>
+      <button class="tool-card" data-tool="mindmap" data-school-only="1" aria-label="知识脑图">🧠<span>知识脑图</span></button>
+      <button class="tool-card" data-tool="report" data-school-only="1" aria-label="学习报告">📊<span>学习报告</span></button>
       <button class="tool-card" data-tool="fun" aria-label="趣味乐园">🎮<span>趣味乐园</span></button>
     </div>
 
@@ -244,6 +251,62 @@ if ('serviceWorker' in navigator) {
         <div class="math-result-detail" id="mathResultDetail"></div>
         <button class="math-result-btn" id="mathRetryBtn">再练一组</button>
       </div>
+    </div>
+
+    <!-- 错题本 -->
+    <div class="tool-panel" id="tool-mistakes">
+      <div class="tool-panel-header">
+        <h3>📷 错题本</h3>
+        <button class="close-panel" data-close="mistakes" aria-label="关闭错题本">✕</button>
+      </div>
+      <div class="mistakes-toolbar">
+        <button class="mistake-add-btn" id="mistakeAddBtn">📷 拍照记错题</button>
+        <select id="mistakeFilterSubject" class="mistake-filter" aria-label="按科目筛选">
+          <option value="">全部科目</option>
+        </select>
+      </div>
+      <div id="mistakeList" class="mistake-list"></div>
+      <input type="file" id="mistakePhotoInput" accept="image/*" capture="environment" style="display:none;">
+    </div>
+
+    <!-- 学习报告（周回顾 + 周报） -->
+    <div class="tool-panel" id="tool-report">
+      <div class="tool-panel-header">
+        <h3>📊 学习报告</h3>
+        <button class="close-panel" data-close="report" aria-label="关闭学习报告">✕</button>
+      </div>
+      <div class="report-tabs">
+        <button class="report-tab active" data-report-tab="week">📅 本周回顾</button>
+        <button class="report-tab" data-report-tab="report">📄 周报</button>
+      </div>
+      <div id="reportWeek" class="report-section">
+        <div id="weekHeatmap" class="week-heatmap"></div>
+        <div class="report-week-note">
+          <h4>💬 本周小结（家长和孩子一起写）</h4>
+          <textarea id="weekNoteInput" class="week-note-input" maxlength="500" placeholder="这一周有什么想说的？进步、困难、开心的事..."></textarea>
+          <button class="report-save-btn" id="weekNoteSaveBtn">💾 保存小结</button>
+        </div>
+      </div>
+      <div id="reportReport" class="report-section" style="display:none;">
+        <button class="report-gen-btn" id="reportGenBtn">📄 生成本周周报</button>
+        <div id="reportContent" class="report-content"></div>
+      </div>
+    </div>
+
+    <!-- 知识脑图 -->
+    <div class="tool-panel" id="tool-mindmap">
+      <div class="tool-panel-header">
+        <h3>🧠 知识脑图</h3>
+        <button class="close-panel" data-close="mindmap" aria-label="关闭知识脑图">✕</button>
+      </div>
+      <div class="mindmap-toolbar">
+        <div class="mindmap-tabs">
+          <button class="mindmap-tab active" data-mm-tab="map">🧠 脑图</button>
+          <button class="mindmap-tab" data-mm-tab="review">🎮 复习闯关</button>
+        </div>
+        <span class="mindmap-hint">点击知识点听讲解，绿色代表已掌握</span>
+      </div>
+      <div id="mindmapContent" class="mindmap-content"></div>
     </div>
 
     <!-- 趣味乐园 - 旅行青蛙游戏 -->
@@ -391,6 +454,12 @@ if ('serviceWorker' in navigator) {
 
         <!-- 课表编辑 -->
         <div class="parent-tab-content active" id="parent-schedule">
+          <h4>本学期课程表图片</h4>
+          <div class="edit-form" id="scheduleImageForm">
+            <button class="add-btn" id="scheduleImageUploadBtn">📷 上传课程表图片</button>
+            <span class="parent-hint">老师发的课程表照片可上传到这里，日程页会展示</span>
+          </div>
+          <div id="scheduleImagePreview" class="sched-img-preview"></div>
           <h4>当前模式课程列表</h4>
           <div id="scheduleEditList" class="edit-list"></div>
           <h4>添加课程（按星期）</h4>
@@ -422,6 +491,10 @@ if ('serviceWorker' in navigator) {
           </div>
           <h4>今日作业科目</h4>
           <div id="dailySubjectsSection" class="daily-subjects-section"></div>
+          <h4>知识点进度管理</h4>
+          <div id="subjectProgressEdit" class="subject-progress-edit"></div>
+          <h4>知识树管理（脑图）</h4>
+          <div id="knowledgeTreeEdit" class="knowledge-tree-edit"></div>
           <h4>打卡任务列表</h4>
           <div id="tasksEditList" class="edit-list"></div>
           <h4>添加打卡任务</h4>
@@ -526,7 +599,7 @@ if ('serviceWorker' in navigator) {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase.js"></script>
-<script src="js/app.js?v=41"></script>
+<script src="js/app.js?v=47"></script>
 <script>
   // Service Worker 注册（暂时注释掉，先排除 SW 缓存干扰）
   // if ('serviceWorker' in navigator) {
