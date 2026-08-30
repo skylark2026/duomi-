@@ -32,7 +32,11 @@ async function loadFromSupabase() {
       { data: checkins },
       { data: redemptions },
       { data: wordCards },
-      { data: memos }
+      { data: memos },
+      { data: mistakes },
+      { data: subjectProgress },
+      { data: weeklyNotes },
+      { data: weeklyReports }
     ] = await Promise.all([
       sb.from('settings').select('*').eq('id', 1).single(),
       sb.from('schedule').select('*').order('created_at'),
@@ -42,7 +46,11 @@ async function loadFromSupabase() {
       sb.from('checkins').select('*'),
       sb.from('redemptions').select('*').order('created_at', { ascending: false }),
       sb.from('word_cards').select('*').order('sort_order'),
-      sb.from('memos').select('*').order('created_at', { ascending: false })
+      sb.from('memos').select('*').order('created_at', { ascending: false }),
+      sb.from('mistakes').select('*').order('created_at', { ascending: false }),
+      sb.from('subject_progress').select('*'),
+      sb.from('weekly_notes').select('*'),
+      sb.from('weekly_reports').select('*').order('generated_at', { ascending: false })
     ]);
 
     // 计算绿宝石总数
@@ -108,9 +116,40 @@ async function loadFromSupabase() {
       date: m.date
     }));
 
+    // 构建错题
+    const mistakesArr = (mistakes || []).map(m => ({
+      id: m.id,
+      subject: m.subject,
+      photoUrl: m.photo_url || null,
+      reason: m.reason || '',
+      status: m.status || 'new',
+      date: m.date,
+      time: m.time || ''
+    }));
+
+    // 构建学科知识点进度
+    const progressObj = {};
+    (subjectProgress || []).forEach(p => {
+      if (!progressObj[p.subject]) progressObj[p.subject] = {};
+      progressObj[p.subject][p.point] = p.status || 'learning';
+    });
+
+    // 构建每周回顾
+    const weeklyNotesObj = {};
+    (weeklyNotes || []).forEach(n => {
+      weeklyNotesObj[n.week_key] = n.content || '';
+    });
+
+    // 构建周报缓存
+    const weeklyReportsArr = (weeklyReports || []).map(r => ({
+      weekKey: r.week_key,
+      content: r.content || '',
+      generatedAt: r.generated_at || ''
+    }));
+
     // 返回完整 DB 对象（保留本地 funPark，旅行游戏状态不做云端同步）
     return {
-      dataVersion: 2,
+      dataVersion: 4,
       settings: {
         mode: settings?.mode || 'holiday',
         parentPassword: settings?.parent_password || '1234',
@@ -126,6 +165,10 @@ async function loadFromSupabase() {
       redeemed,
       wordCards: cards,
       memos: memoArr,
+      mistakes: mistakesArr,
+      subjectProgress: progressObj,
+      weeklyNotes: weeklyNotesObj,
+      weeklyReports: weeklyReportsArr,
       // funPark 纯本地保存，不同步到云端，但必须从本地保留
       funPark: DB.funPark || null
     };
@@ -289,6 +332,93 @@ async function pollFromSupabase() {
   } catch (e) {
     // 静默失败，不影响使用
     console.debug('[Supabase] 轮询失败:', e.message);
+  }
+}
+
+/* ====== 错题写入 Supabase ====== */
+async function pushMistakeToSupabase(mistake) {
+  if (!sb) return;
+  try {
+    await sb.from('mistakes').upsert({
+      id: mistake.id,
+      subject: mistake.subject,
+      photo_url: mistake.photoUrl || null,
+      reason: mistake.reason || '',
+      status: mistake.status || 'new',
+      date: mistake.date,
+      time: mistake.time || ''
+    });
+  } catch (e) {
+    console.error('错题同步失败:', e);
+  }
+}
+
+/* ====== 删除错题 ====== */
+async function deleteMistakeFromSupabase(id) {
+  if (!sb) return;
+  try {
+    await sb.from('mistakes').delete().eq('id', id);
+  } catch (e) {
+    console.error('错题删除同步失败:', e);
+  }
+}
+
+/* ====== 学科知识点进度写入 Supabase ====== */
+async function pushSubjectProgressToSupabase() {
+  if (!sb) return;
+  try {
+    // 先清空再全量写入（知识点数据量小）
+    await sb.from('subject_progress').delete().neq('id', -1);
+    const rows = [];
+    for (const subject in (DB.subjectProgress || {})) {
+      for (const point in DB.subjectProgress[subject]) {
+        rows.push({ subject, point, status: DB.subjectProgress[subject][point] });
+      }
+    }
+    if (rows.length > 0) await sb.from('subject_progress').insert(rows);
+  } catch (e) {
+    console.error('学科进度同步失败:', e);
+  }
+}
+
+/* ====== 每周回顾写入 Supabase ====== */
+async function pushWeeklyNoteToSupabase(weekKey, content) {
+  if (!sb) return;
+  try {
+    await sb.from('weekly_notes').upsert({ week_key: weekKey, content });
+  } catch (e) {
+    console.error('每周回顾同步失败:', e);
+  }
+}
+
+/* ====== 周报写入 Supabase ====== */
+async function pushWeeklyReportToSupabase(weekKey, content) {
+  if (!sb) return;
+  try {
+    await sb.from('weekly_reports').upsert({ week_key: weekKey, content });
+  } catch (e) {
+    console.error('周报同步失败:', e);
+  }
+}
+
+/* ====== 上传错题照片到 Storage ====== */
+async function uploadMistakePhoto(blob, fileName) {
+  if (!sb) return null;
+  try {
+    const path = `${Date.now()}_${fileName}`;
+    const { error } = await sb.storage.from('mistakes').upload(path, blob, {
+      contentType: blob.type,
+      cacheControl: '3600'
+    });
+    if (error) {
+      console.error('照片上传失败:', error);
+      return null;
+    }
+    const { data } = sb.storage.from('mistakes').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (e) {
+    console.error('照片上传异常:', e);
+    return null;
   }
 }
 

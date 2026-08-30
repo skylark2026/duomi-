@@ -6,7 +6,7 @@
 
 /* ====== 数据层 ====== */
 const STORE_KEY = 'duomi_workbench_v2';
-const DATA_VERSION = 3;
+const DATA_VERSION = 9;
 
 const DEFAULT_DATA = {
   dataVersion: DATA_VERSION,
@@ -56,6 +56,14 @@ const DEFAULT_DATA = {
   wordCards: [],
   nce1Lesson: 0,
   memos: [],  // { id, text, date }
+  subjectProgress: {},   // 手动知识点进度 { '语文': { '拼音': 'mastered' } }
+  mistakes: [],          // 错题 { id, subject, photoUrl, reason, status, date, time, pointId }
+  weeklyNotes: {},       // 每周回顾 { '2026-W34': '文字' }
+  weeklyReports: [],     // 周报缓存 { weekKey, content, generatedAt }
+  knowledgeTree: {},     // 知识树 { '语文': { '汉语拼音': { '声母 b p m f': { mastered: false } } } }
+  reviewState: {},       // 复习闯关进度 { pointKey: { box: 1, nextReview: '2026-08-31', correct: 0 } }
+  dailyLearned: {},      // 今日已学知识点 { '2026-08-30': ['语文||单元||知识点', ...] }
+  scheduleImage: null,   // 课程表图片 { url, updatedAt }
   mathPractice: {
     lastDate: '',      // '2026-08-09'
     completedCount: 0, // 当天已完成题数
@@ -79,6 +87,115 @@ const DEFAULT_DATA = {
 };
 
 let DB = {};
+
+/* ====== 内置一年级知识树模板（部编版语文 + 人教版数学） ====== */
+const DEFAULT_KNOWLEDGE_TREE = {
+  '语文': {
+    '汉语拼音': {
+      '单韵母 a o e': { mastered: false },
+      '单韵母 i u ü': { mastered: false },
+      '声母 b p m f': { mastered: false },
+      '声母 d t n l': { mastered: false },
+      '声母 g k h': { mastered: false },
+      '声母 j q x': { mastered: false },
+      '声母 z c s': { mastered: false },
+      '声母 zh ch sh r': { mastered: false },
+      '声母 y w': { mastered: false },
+      '复韵母 ai ei ui': { mastered: false },
+      '复韵母 ao ou iu': { mastered: false },
+      '复韵母 ie üe er': { mastered: false },
+      '前鼻韵母 an en in un ün': { mastered: false },
+      '后鼻韵母 ang eng ing ong': { mastered: false },
+      '整体认读音节': { mastered: false }
+    },
+    '识字': {
+      '天地人 你我他': { mastered: false },
+      '金木水火土': { mastered: false },
+      '口耳目手足': { mastered: false },
+      '日月水火 山石田禾': { mastered: false },
+      '对韵歌': { mastered: false }
+    },
+    '课文': {
+      '秋天': { mastered: false },
+      '小小的船': { mastered: false },
+      '江南': { mastered: false },
+      '四季': { mastered: false }
+    }
+  },
+  '数学': {
+    '数的认识': {
+      '数一数 1~10': { mastered: false },
+      '11~20 各数': { mastered: false },
+      '比一比 大小多少': { mastered: false }
+    },
+    '加减法': {
+      '1~5 的加减法': { mastered: false },
+      '6~10 的加减法': { mastered: false },
+      '10 以内的连加连减': { mastered: false },
+      '20 以内的进位加法': { mastered: false }
+    },
+    '图形与位置': {
+      '认识图形 长方体正方体': { mastered: false },
+      '上下前后左右': { mastered: false }
+    },
+    '钟表': {
+      '认识整时': { mastered: false }
+    }
+  }
+};
+
+/* ====== 一年级1班课表（2026 秋季学期），按周一~周五排列 ====== */
+const DEFAULT_SCHOOL_SCHEDULE_GRADE1 = [
+  // 周一
+  { day: '1', startTime: '09:50', endTime: '10:30', title: '班团队活动' },
+  { day: '1', startTime: '10:40', endTime: '11:20', title: '数学' },
+  { day: '1', startTime: '11:30', endTime: '12:30', title: '午餐' },
+  { day: '1', startTime: '12:30', endTime: '13:30', title: '午休活动' },
+  { day: '1', startTime: '13:30', endTime: '14:10', title: '主题教育' },
+  { day: '1', startTime: '14:20', endTime: '15:00', title: '语文' },
+  { day: '1', startTime: '15:10', endTime: '15:50', title: '体育与健康' },
+  { day: '1', startTime: '16:00', endTime: '16:40', title: '课后活动' },
+  // 周二
+  { day: '2', startTime: '09:50', endTime: '10:30', title: '语文' },
+  { day: '2', startTime: '10:40', endTime: '11:20', title: '体育与健康' },
+  { day: '2', startTime: '11:30', endTime: '12:30', title: '午餐' },
+  { day: '2', startTime: '12:30', endTime: '13:30', title: '午休活动' },
+  { day: '2', startTime: '13:30', endTime: '14:10', title: '主题教育' },
+  { day: '2', startTime: '14:20', endTime: '15:00', title: '校本课程' },
+  { day: '2', startTime: '15:10', endTime: '15:50', title: '科学' },
+  { day: '2', startTime: '16:00', endTime: '16:40', title: '课后活动' },
+  // 周三
+  { day: '3', startTime: '09:50', endTime: '10:30', title: '体育与健康' },
+  { day: '3', startTime: '10:40', endTime: '11:20', title: '英语' },
+  { day: '3', startTime: '11:30', endTime: '12:30', title: '午餐' },
+  { day: '3', startTime: '12:30', endTime: '13:30', title: '午休活动' },
+  { day: '3', startTime: '13:30', endTime: '14:10', title: '主题教育' },
+  { day: '3', startTime: '14:20', endTime: '15:00', title: '造型.美术' },
+  { day: '3', startTime: '15:10', endTime: '15:50', title: '道德与法治' },
+  { day: '3', startTime: '16:00', endTime: '16:40', title: '课后活动' },
+  // 周四
+  { day: '4', startTime: '09:50', endTime: '10:30', title: '数学' },
+  { day: '4', startTime: '10:40', endTime: '11:20', title: '体育与健康' },
+  { day: '4', startTime: '11:30', endTime: '12:30', title: '午餐' },
+  { day: '4', startTime: '12:30', endTime: '13:30', title: '午休活动' },
+  { day: '4', startTime: '13:30', endTime: '14:10', title: '主题教育' },
+  { day: '4', startTime: '14:20', endTime: '15:00', title: '语文' },
+  { day: '4', startTime: '15:10', endTime: '15:50', title: '唱游.音乐' },
+  { day: '4', startTime: '16:00', endTime: '16:40', title: '课后活动' },
+  // 周五
+  { day: '5', startTime: '09:50', endTime: '10:30', title: '道德与法治' },
+  { day: '5', startTime: '10:40', endTime: '11:20', title: '唱游.音乐' },
+  { day: '5', startTime: '11:30', endTime: '12:30', title: '午餐' },
+  { day: '5', startTime: '12:30', endTime: '13:30', title: '午休活动' },
+  { day: '5', startTime: '13:30', endTime: '14:10', title: '主题教育' },
+  { day: '5', startTime: '14:20', endTime: '15:00', title: '语文' },
+  { day: '5', startTime: '15:10', endTime: '15:50', title: '造型.美术' },
+  { day: '5', startTime: '16:00', endTime: '16:40', title: '课后活动' },
+  // 课后课程（开学模式保留）
+  { day: '1', startTime: '18:30', endTime: '19:30', title: '英语外教课' },
+  { day: '2', startTime: '17:35', endTime: '18:35', title: '新加坡数学网课' },
+  { day: '5', startTime: '17:35', endTime: '18:35', title: '新加坡数学网课' }
+];
 
 /* ====== HTML 转义函数（P1: 防注入） ====== */
 function esc(str) {
@@ -153,6 +270,74 @@ function migrateData(data) {
     if (!data.settings.homeworkSubjects) data.settings.homeworkSubjects = ['语文','数学','英语'];
     if (!data.settings.dailySubjects) data.settings.dailySubjects = {};
     data.dataVersion = 3;
+  }
+  // v3 -> v4: 学科进度追踪 + 错题本 + 每周回顾 + 周报
+  if (!data.dataVersion || data.dataVersion < 4) {
+    if (!data.subjectProgress) data.subjectProgress = {};
+    if (!Array.isArray(data.mistakes)) data.mistakes = [];
+    if (!data.weeklyNotes) data.weeklyNotes = {};
+    if (!Array.isArray(data.weeklyReports)) data.weeklyReports = [];
+    data.dataVersion = 4;
+  }
+  // v4 -> v5: 知识树 + 复习闯关 + 课程表图片
+  if (!data.dataVersion || data.dataVersion < 5) {
+    if (!data.knowledgeTree || Object.keys(data.knowledgeTree).length === 0) {
+      data.knowledgeTree = structuredClone(DEFAULT_KNOWLEDGE_TREE);
+    }
+    if (!data.reviewState) data.reviewState = {};
+    if (!data.scheduleImage) data.scheduleImage = null;
+    data.dataVersion = 5;
+  }
+  // v5 -> v6: 今日已学知识点（每天回来复习今天学的）
+  if (!data.dataVersion || data.dataVersion < 6) {
+    if (!data.dailyLearned) data.dailyLearned = {};
+    data.dataVersion = 6;
+  }
+  // v6 -> v7: 导入一年级1班课表（2026秋季）+ 课程表图片
+  if (!data.dataVersion || data.dataVersion < 7) {
+    if (!data.schedule) data.schedule = { holiday: [], school: [], custom: [] };
+    if (!Array.isArray(data.schedule.school) || data.schedule.school.length === 0) {
+      // 自动导入一年级1班课表（用户提供的原图）
+      data.schedule.school = DEFAULT_SCHOOL_SCHEDULE_GRADE1.map(c => ({
+        id: uid(),
+        day: c.day,
+        startTime: c.startTime,
+        endTime: c.endTime,
+        title: c.title,
+        alarm: true
+      }));
+    }
+    if (!data.scheduleImage) {
+      data.scheduleImage = {
+        url: 'images/schedule-2026-autumn.jpg',
+        updatedAt: '2026-08-30'
+      };
+    }
+    data.dataVersion = 7;
+  }
+  // v7 -> v8: 追加课后课程（英语外教课 + 新加坡数学网课）到开学课表
+  if (!data.dataVersion || data.dataVersion < 8) {
+    if (data.schedule && Array.isArray(data.schedule.school)) {
+      const afterSchool = [
+        { day: '1', startTime: '18:30', endTime: '19:30', title: '英语外教课' },
+        { day: '2', startTime: '17:35', endTime: '18:35', title: '新加坡数学网课' },
+        { day: '5', startTime: '17:35', endTime: '18:35', title: '新加坡数学网课' }
+      ];
+      afterSchool.forEach(c => {
+        const exists = data.schedule.school.some(s => s.title === c.title && s.day === c.day && s.startTime === c.startTime);
+        if (!exists) {
+          data.schedule.school.push({ id: uid(), day: c.day, startTime: c.startTime, endTime: c.endTime, title: c.title, alarm: true });
+        }
+      });
+    }
+    data.dataVersion = 8;
+  }
+  // v8 -> v9: 已导入学校课表则自动切换到开学模式（否则今日日程不显示课表）
+  if (!data.dataVersion || data.dataVersion < 9) {
+    if (data.settings && data.schedule && Array.isArray(data.schedule.school) && data.schedule.school.length > 0) {
+      if (data.settings.mode !== 'school') data.settings.mode = 'school';
+    }
+    data.dataVersion = 9;
   }
 }
 
@@ -344,6 +529,8 @@ function getDateForWeekday(targetDayNum) {
 function renderSchedulePage() {
   document.getElementById('todayDate').textContent = formatDate();
   updateStarDisplay();
+  // 渲染课程表图片
+  if (typeof StudyTracker !== 'undefined') StudyTracker.renderScheduleImage();
 
   if (scheduleView === 'today') {
     renderTodayView();
@@ -485,6 +672,8 @@ function getTodaySubjects() {
 /* ====== 渲染：打卡任务 ====== */
 function renderTaskPage() {
   updateStarDisplay();
+  // 渲染学科学习进度卡（开学模式功能）
+  if (typeof StudyTracker !== 'undefined') StudyTracker.renderSubjectProgress();
   const todayCheckins = DB.checkins[todayStr()] || {};
   const taskEl = document.getElementById('taskList');
   if (DB.tasks.length === 0) {
@@ -818,6 +1007,22 @@ function updateModeBadge() {
   document.getElementById('modeBadge').textContent = DB.settings.mode === 'holiday' ? '假期模式' : '开学模式';
 }
 
+/* ====== 开学模式专属工具显隐 ====== */
+function updateSchoolOnlyTools() {
+  const isSchool = DB.settings.mode === 'school';
+  document.querySelectorAll('.tool-card[data-school-only]').forEach(card => {
+    card.style.display = isSchool ? '' : 'none';
+  });
+  // 如果当前打开的是开学模式专属工具，而切换到假期模式，则关闭该工具
+  if (!isSchool) {
+    const openedSchoolTool = document.querySelector('.tool-panel.show#tool-mistakes, .tool-panel.show#tool-mindmap, .tool-panel.show#tool-report');
+    if (openedSchoolTool) {
+      openedSchoolTool.classList.remove('show');
+      openedSchoolTool.setAttribute('aria-hidden', 'true');
+    }
+  }
+}
+
 function updateStarDisplay() {
   document.getElementById('starCount').textContent = DB.starLog.total;
   document.getElementById('starNumHome').textContent = DB.starLog.total;
@@ -830,6 +1035,8 @@ function renderParentSchedule() {
   const mode = DB.settings.mode;
   const list = DB.schedule[mode] || [];
   const el = document.getElementById('scheduleEditList');
+  // 渲染课程表图片预览
+  if (typeof StudyTracker !== 'undefined') StudyTracker.renderScheduleImagePreview();
   if (list.length === 0) {
     el.innerHTML = '<div class="empty-state">暂无课程</div>';
   } else {
@@ -935,6 +1142,11 @@ function addCustomSchedule() {
 /* ====== 家长模式：任务编辑 ====== */
 function renderParentTasks() {
   const el = document.getElementById('tasksEditList');
+  // 渲染知识点进度管理 + 知识树管理
+  if (typeof StudyTracker !== 'undefined') {
+    StudyTracker.renderSubjectProgressEdit();
+    StudyTracker.renderKnowledgeTreeEdit();
+  }
   if (DB.tasks.length === 0) {
     el.innerHTML = '<div class="empty-state">暂无任务</div>';
   } else {
@@ -2430,6 +2642,1183 @@ const Memo = {
   }
 };
 
+/* ============================================
+ * 学习追踪模块（v4.0 开学模式）
+ * 学科进度 + 错题本 + 周回顾 + 周报
+ * ============================================ */
+const StudyTracker = {
+  /* ---- 工具函数：周键 '2026-W34' ---- */
+  getWeekKey(date) {
+    const d = date || new Date();
+    const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+    const pastDays = (d - firstDayOfYear) / 86400000;
+    const weekNum = Math.ceil((pastDays + firstDayOfYear.getDay() + 1) / 7);
+    return `${d.getFullYear()}-W${weekNum}`;
+  },
+
+  getWeekStart(date) {
+    const d = date || new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // 周一为一周开始
+    const monday = new Date(d);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  },
+
+  dateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
+  /* ---- 统计本周某科目完成天数 ---- */
+  weekSubjectDoneDays(subject) {
+    const start = this.getWeekStart();
+    const key = 'hw_' + subject;
+    let count = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const ds = this.dateStr(d);
+      if (DB.checkins[ds] && DB.checkins[ds][key]) count++;
+    }
+    return count;
+  },
+
+  /* ---- 统计某科目错题数 ---- */
+  subjectMistakeCount(subject) {
+    return (DB.mistakes || []).filter(m => m.subject === subject).length;
+  },
+
+  subjectMistakeUnresolved(subject) {
+    return (DB.mistakes || []).filter(m => m.subject === subject && m.status !== 'mastered').length;
+  },
+
+  /* ---- 统计某科目累计宝石 ---- */
+  subjectTotalStars(subject) {
+    const key = 'hw_' + subject;
+    return (DB.starLog.history || []).filter(h => h.taskId === key).reduce((s, h) => s + (h.stars || 0), 0);
+  },
+
+  /* ---- 渲染学科进度卡（打卡任务页顶部） ---- */
+  renderSubjectProgress() {
+    const el = document.getElementById('subjectProgressArea');
+    if (!el) return;
+    const subjects = DB.settings.homeworkSubjects || [];
+    if (subjects.length === 0) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = `
+      <div class="subject-progress-header">
+        <span class="subject-progress-title">📊 学科学习进度</span>
+        <span class="subject-progress-week">本周 ${this.getWeekKey()}</span>
+      </div>
+      <div class="subject-progress-grid">
+        ${subjects.map(s => {
+          const doneDays = this.weekSubjectDoneDays(s);
+          const totalStars = this.subjectTotalStars(s);
+          const mistakes = this.subjectMistakeCount(s);
+          const unresolved = this.subjectMistakeUnresolved(s);
+          const progress = DB.subjectProgress && DB.subjectProgress[s] ? DB.subjectProgress[s] : {};
+          const points = Object.keys(progress);
+          const mastered = points.filter(p => progress[p] === 'mastered').length;
+          const weekPct = Math.min(100, Math.round(doneDays / 5 * 100)); // 按5个工作日算
+          return `
+            <div class="subject-progress-card" data-subject="${esc(s)}">
+              <div class="spc-top">
+                <span class="spc-name">${esc(s)}</span>
+                <span class="spc-days">本周 ${doneDays} 天</span>
+              </div>
+              <div class="spc-bar"><div class="spc-bar-fill" style="width:${weekPct}%"></div></div>
+              <div class="spc-stats">
+                <span>💎 ${totalStars}</span>
+                <span>📷 错题 ${mistakes}${unresolved > 0 ? `（${unresolved}待订正）` : ''}</span>
+                ${points.length > 0 ? `<span>🎯 知识点 ${mastered}/${points.length}</span>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+    // 点击进度卡语音播报
+    el.querySelectorAll('.subject-progress-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const s = card.dataset.subject;
+        speak(`${s}，本周完成${this.weekSubjectDoneDays(s)}天，错题${this.subjectMistakeCount(s)}道`);
+      });
+    });
+  },
+
+  /* ---- 渲染家长模式知识点管理 ---- */
+  renderSubjectProgressEdit() {
+    const el = document.getElementById('subjectProgressEdit');
+    if (!el) return;
+    const subjects = DB.settings.homeworkSubjects || [];
+    if (!DB.subjectProgress) DB.subjectProgress = {};
+    if (subjects.length === 0) {
+      el.innerHTML = '<div class="empty-state">请先添加作业科目</div>';
+      return;
+    }
+    el.innerHTML = subjects.map(s => {
+      const progress = DB.subjectProgress[s] || {};
+      const points = Object.keys(progress);
+      return `
+        <div class="sp-edit-subject">
+          <div class="sp-edit-subject-name">${esc(s)}</div>
+          <div class="sp-edit-points">
+            ${points.map(p => `
+              <div class="sp-edit-point">
+                <span class="sp-edit-point-name">${esc(p)}</span>
+                <button class="sp-status-btn ${progress[p] === 'mastered' ? 'mastered' : ''}" data-subject="${esc(s)}" data-point="${esc(p)}" aria-label="切换掌握状态">
+                  ${progress[p] === 'mastered' ? '✅ 已掌握' : '📖 学习中'}
+                </button>
+                <button class="sp-del-btn" data-subject="${esc(s)}" data-point="${esc(p)}" aria-label="删除知识点">🗑️</button>
+              </div>
+            `).join('')}
+          </div>
+          <div class="sp-add-point">
+            <input type="text" class="sp-add-input" data-subject="${esc(s)}" placeholder="知识点（如：拼音）" maxlength="12">
+            <button class="sp-add-btn" data-subject="${esc(s)}">➕</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    // 切换掌握状态
+    el.querySelectorAll('.sp-status-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const s = btn.dataset.subject, p = btn.dataset.point;
+        if (!DB.subjectProgress[s]) return;
+        DB.subjectProgress[s][p] = DB.subjectProgress[s][p] === 'mastered' ? 'learning' : 'mastered';
+        saveDB();
+        if (typeof pushSubjectProgressToSupabase === 'function') pushSubjectProgressToSupabase();
+        this.renderSubjectProgressEdit();
+        this.renderSubjectProgress();
+        toast(`${s}·${p} 已更新`);
+      });
+    });
+
+    // 删除知识点
+    el.querySelectorAll('.sp-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const s = btn.dataset.subject, p = btn.dataset.point;
+        showConfirm('删除知识点', `确定删除「${s}·${p}」吗？`, () => {
+          if (DB.subjectProgress[s]) delete DB.subjectProgress[s][p];
+          saveDB();
+          if (typeof pushSubjectProgressToSupabase === 'function') pushSubjectProgressToSupabase();
+          this.renderSubjectProgressEdit();
+          this.renderSubjectProgress();
+          toast('知识点已删除');
+        });
+      });
+    });
+
+    // 添加知识点
+    el.querySelectorAll('.sp-add-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const s = btn.dataset.subject;
+        const input = el.querySelector(`.sp-add-input[data-subject="${CSS.escape(s)}"]`);
+        const name = input.value.trim();
+        if (!name) { toast('请输入知识点名称'); return; }
+        if (!DB.subjectProgress[s]) DB.subjectProgress[s] = {};
+        if (DB.subjectProgress[s][name]) { toast('该知识点已存在'); return; }
+        DB.subjectProgress[s][name] = 'learning';
+        saveDB();
+        if (typeof pushSubjectProgressToSupabase === 'function') pushSubjectProgressToSupabase();
+        this.renderSubjectProgressEdit();
+        this.renderSubjectProgress();
+        toast('知识点已添加');
+      });
+    });
+
+    // 回车添加
+    el.querySelectorAll('.sp-add-input').forEach(input => {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          const btn = el.querySelector(`.sp-add-btn[data-subject="${CSS.escape(input.dataset.subject)}"]`);
+          if (btn) btn.click();
+        }
+      });
+    });
+  },
+
+  /* ---- 错题本 ---- */
+  renderMistakes() {
+    const el = document.getElementById('mistakeList');
+    if (!el) return;
+    const filterEl = document.getElementById('mistakeFilterSubject');
+    const subjects = DB.settings.homeworkSubjects || [];
+    const filter = filterEl ? filterEl.value : '';
+
+    // 填充筛选下拉
+    if (filterEl && filterEl.options.length <= 1) {
+      subjects.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s;
+        opt.textContent = s;
+        filterEl.appendChild(opt);
+      });
+    }
+
+    let list = DB.mistakes || [];
+    if (filter) list = list.filter(m => m.subject === filter);
+
+    if (list.length === 0) {
+      el.innerHTML = '<div class="empty-state">还没有错题，点击上方按钮拍照记录吧</div>';
+      return;
+    }
+
+    // 按科目分组
+    const groups = {};
+    list.forEach(m => {
+      if (!groups[m.subject]) groups[m.subject] = [];
+      groups[m.subject].push(m);
+    });
+
+    let html = '';
+    for (const subject in groups) {
+      html += `<div class="mistake-group"><h4 class="mistake-group-title">${esc(subject)}</h4>`;
+      groups[subject].forEach(m => {
+        const statusLabel = { new: '未订正', corrected: '已订正', mastered: '已掌握' }[m.status] || '未订正';
+        const statusClass = m.status || 'new';
+        html += `
+          <div class="mistake-item ${statusClass}">
+            ${m.photoUrl ? `<div class="mistake-photo" style="background-image:url('${esc(m.photoUrl)}')"></div>` : `<div class="mistake-photo empty">📷</div>`}
+            <div class="mistake-info">
+              <div class="mistake-reason">${esc(m.reason || '（未填写错因）')}</div>
+              <div class="mistake-meta">${esc(m.date)}${m.time ? ' ' + esc(m.time) : ''}</div>
+            </div>
+            <div class="mistake-actions">
+              <button class="mistake-status-btn" data-mistake-id="${esc(m.id)}" data-mistake-status="${esc(statusClass)}" aria-label="切换状态">${statusLabel}</button>
+              <button class="mistake-del-btn" data-mistake-id="${esc(m.id)}" aria-label="删除错题">🗑️</button>
+            </div>
+          </div>
+        `;
+      });
+      html += `</div>`;
+    }
+    el.innerHTML = html;
+
+    // 绑定状态切换（循环 new -> corrected -> mastered -> new）
+    el.querySelectorAll('.mistake-status-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.mistakeId;
+        const m = (DB.mistakes || []).find(x => x.id === id);
+        if (!m) return;
+        const order = ['new', 'corrected', 'mastered'];
+        const idx = order.indexOf(m.status || 'new');
+        m.status = order[(idx + 1) % order.length];
+        saveDB();
+        if (typeof pushMistakeToSupabase === 'function') pushMistakeToSupabase(m);
+        this.renderMistakes();
+        this.renderSubjectProgress();
+        toast('错题状态已更新');
+      });
+    });
+
+    // 绑定删除
+    el.querySelectorAll('.mistake-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.mistakeId;
+        showConfirm('删除错题', '确定要删除这道错题吗？', () => {
+          DB.mistakes = (DB.mistakes || []).filter(x => x.id !== id);
+          saveDB();
+          if (typeof deleteMistakeFromSupabase === 'function') deleteMistakeFromSupabase(id);
+          this.renderMistakes();
+          this.renderSubjectProgress();
+          toast('错题已删除');
+        });
+      });
+    });
+  },
+
+  /* ---- 拍照添加错题 ---- */
+  addMistakeFromPhoto() {
+    // 动态创建 input 并挂载到 DOM，避免 iPad Safari 上 display:none 无法触发
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(input);
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) return;
+
+      // 选择科目
+      const subjects = DB.settings.homeworkSubjects || ['语文', '数学', '英语'];
+      const subject = subjects.length === 1 ? subjects[0] : null;
+      if (!subject) {
+        // 多科目时让用户选择
+        const subjectChoice = await new Promise(resolve => {
+          this.pickSubject(subjects, resolve);
+        });
+        if (!subjectChoice) return;
+        this._createMistake(file, subjectChoice);
+      } else {
+        this._createMistake(file, subject);
+      }
+    };
+    input.click();
+  },
+
+  pickSubject(subjects, resolve) {
+    // 简单实现：用 confirm 弹窗不行，改用依次询问。这里用一个简易选择弹层
+    const overlay = document.createElement('div');
+    overlay.className = 'subject-pick-overlay';
+    overlay.innerHTML = `<div class="subject-pick-box">
+      <h4>这道错题属于哪个科目？</h4>
+      ${subjects.map(s => `<button class="subject-pick-btn" data-subject="${esc(s)}">${esc(s)}</button>`).join('')}
+      <button class="subject-pick-cancel">取消</button>
+    </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelectorAll('.subject-pick-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        overlay.remove();
+        resolve(btn.dataset.subject);
+      });
+    });
+    overlay.querySelector('.subject-pick-cancel').addEventListener('click', () => {
+      overlay.remove();
+      resolve(null);
+    });
+  },
+
+  async _createMistake(file, subject) {
+    let photoUrl = null;
+    // 尝试上传到 Supabase Storage
+    if (typeof uploadMistakePhoto === 'function') {
+      toast('正在上传照片...');
+      photoUrl = await uploadMistakePhoto(file, file.name || 'mistake.jpg');
+    }
+    if (!photoUrl) {
+      // 降级：本地 base64（可能较大，但保证可用）
+      try {
+        photoUrl = await new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      } catch (e) { photoUrl = null; }
+    }
+
+    const id = uid();
+    const now = new Date();
+    const mistake = {
+      id,
+      subject,
+      photoUrl,
+      reason: '',
+      status: 'new',
+      date: todayStr(),
+      time: now.toTimeString().substr(0, 5)
+    };
+    DB.mistakes = DB.mistakes || [];
+    DB.mistakes.unshift(mistake);
+    saveDB();
+    if (typeof pushMistakeToSupabase === 'function') pushMistakeToSupabase(mistake);
+
+    // 让用户填写错因
+    this.promptReason(id);
+  },
+
+  promptReason(id) {
+    const m = (DB.mistakes || []).find(x => x.id === id);
+    if (!m) return;
+    const reason = prompt('这道题错在哪里？简单写一句（可留空）', '');
+    if (reason !== null) {
+      m.reason = reason.trim();
+      saveDB();
+      if (typeof pushMistakeToSupabase === 'function') pushMistakeToSupabase(m);
+    }
+    this.renderMistakes();
+    this.renderSubjectProgress();
+    toast('错题已记录 📷');
+  },
+
+  /* ---- 周回顾热力图 ---- */
+  renderWeekHeatmap() {
+    const el = document.getElementById('weekHeatmap');
+    if (!el) return;
+    const subjects = DB.settings.homeworkSubjects || [];
+    const start = this.getWeekStart();
+    const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+    if (subjects.length === 0) {
+      el.innerHTML = '<div class="empty-state">请先添加作业科目</div>';
+      return;
+    }
+
+    let html = `<div class="heatmap-subject-col"><div class="heatmap-corner"></div>${subjects.map(s => `<div class="heatmap-subject-label">${esc(s)}</div>`).join('')}</div>`;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const ds = this.dateStr(d);
+      const isToday = ds === todayStr();
+      html += `<div class="heatmap-day-col ${isToday ? 'today' : ''}">
+        <div class="heatmap-day-label">${weekDays[i]}<br>${String(d.getMonth() + 1)}/${String(d.getDate())}</div>
+        ${subjects.map(s => {
+          const done = DB.checkins[ds] && DB.checkins[ds]['hw_' + s];
+          return `<div class="heatmap-cell ${done ? 'done' : ''}">${done ? '✅' : '·'}</div>`;
+        }).join('')}
+      </div>`;
+    }
+    el.innerHTML = `<div class="heatmap-wrapper">${html}</div>`;
+
+    // 加载本周小结
+    const weekKey = this.getWeekKey();
+    const noteEl = document.getElementById('weekNoteInput');
+    if (noteEl) noteEl.value = (DB.weeklyNotes || {})[weekKey] || '';
+  },
+
+  /* ---- 保存每周小结 ---- */
+  saveWeekNote() {
+    const noteEl = document.getElementById('weekNoteInput');
+    if (!noteEl) return;
+    const weekKey = this.getWeekKey();
+    if (!DB.weeklyNotes) DB.weeklyNotes = {};
+    DB.weeklyNotes[weekKey] = noteEl.value.trim();
+    saveDB();
+    if (typeof pushWeeklyNoteToSupabase === 'function') pushWeeklyNoteToSupabase(weekKey, noteEl.value.trim());
+    toast('本周小结已保存 💬');
+  },
+
+  /* ---- 生成周报 ---- */
+  generateWeeklyReport() {
+    const weekKey = this.getWeekKey();
+    const subjects = DB.settings.homeworkSubjects || [];
+    const start = this.getWeekStart();
+    const lines = [];
+
+    lines.push(`📊 多米学习周报（${weekKey}）`);
+    lines.push(`━━━━━━━━━━━━━━━━`);
+
+    // 各科完成情况
+    let totalDoneDays = 0;
+    subjects.forEach(s => {
+      const doneDays = this.weekSubjectDoneDays(s);
+      totalDoneDays += doneDays;
+      const mistakes = this.subjectMistakeCount(s);
+      const unresolved = this.subjectMistakeUnresolved(s);
+      const stars = this.subjectTotalStars(s);
+      lines.push(`【${s}】完成 ${doneDays} 天 · 错题 ${mistakes}${unresolved > 0 ? `（${unresolved}待订正）` : ''} · 💎${stars}`);
+    });
+
+    lines.push(`━━━━━━━━━━━━━━━━`);
+
+    // 连续打卡天数（本周内）
+    const weekStart = this.getWeekStart();
+    let maxStreak = 0, curStreak = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const ds = this.dateStr(d);
+      const dayCheckins = DB.checkins[ds] || {};
+      const hasAny = Object.keys(dayCheckins).some(k => dayCheckins[k]);
+      if (hasAny) { curStreak++; maxStreak = Math.max(maxStreak, curStreak); }
+      else curStreak = 0;
+    }
+    lines.push(`🔥 本周最长连续打卡：${maxStreak} 天`);
+
+    // 宝石变化（本周获得的宝石）
+    const weekStars = (DB.starLog.history || []).filter(h => {
+      const d = new Date(h.date);
+      return d >= weekStart && d < new Date(weekStart.getTime() + 7 * 86400000);
+    }).reduce((s, h) => s + (h.stars || 0), 0);
+    lines.push(`💎 本周获得绿宝石：${weekStars} 颗`);
+    lines.push(`🏆 累计绿宝石：${DB.starLog.total} 颗`);
+
+    // 错题汇总
+    const weekMistakes = (DB.mistakes || []).filter(m => m.date >= this.dateStr(weekStart) && m.date <= this.dateStr(new Date(weekStart.getTime() + 6 * 86400000)));
+    if (weekMistakes.length > 0) {
+      lines.push(`📷 本周新增错题：${weekMistakes.length} 道`);
+    }
+
+    lines.push(`━━━━━━━━━━━━━━━━`);
+
+    // 小结
+    const note = (DB.weeklyNotes || {})[weekKey] || '';
+    if (note) {
+      lines.push(`💬 本周小结：`);
+      lines.push(note);
+    } else {
+      lines.push(`💬 本周小结：还没有写，全家一起聊聊这周吧～`);
+    }
+
+    const content = lines.join('\n');
+
+    // 保存到缓存 + 云端
+    DB.weeklyReports = DB.weeklyReports || [];
+    DB.weeklyReports = DB.weeklyReports.filter(r => r.weekKey !== weekKey);
+    DB.weeklyReports.unshift({ weekKey, content, generatedAt: new Date().toISOString() });
+    saveDB();
+    if (typeof pushWeeklyReportToSupabase === 'function') pushWeeklyReportToSupabase(weekKey, content);
+
+    return content;
+  },
+
+  renderReport() {
+    const el = document.getElementById('reportContent');
+    if (!el) return;
+    const weekKey = this.getWeekKey();
+    const cached = (DB.weeklyReports || []).find(r => r.weekKey === weekKey);
+    if (cached) {
+      el.innerHTML = `
+        <div class="report-text">${esc(cached.content).replace(/\n/g, '<br>')}</div>
+        <button class="report-copy-btn" id="reportCopyBtn">📋 复制周报文字</button>
+      `;
+      const copyBtn = document.getElementById('reportCopyBtn');
+      if (copyBtn) copyBtn.addEventListener('click', () => this.copyReport(cached.content));
+    } else {
+      el.innerHTML = '<div class="empty-state">点击上方按钮生成本周周报</div>';
+    }
+  },
+
+  copyReport(content) {
+    const textarea = document.createElement('textarea');
+    textarea.value = content;
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      toast('周报已复制，去家庭群粘贴吧 📋');
+    } catch (e) {
+      toast('复制失败，请手动选择文字');
+    }
+    document.body.removeChild(textarea);
+  },
+
+  /* ---- 知识脑图渲染 ---- */
+  renderMindmap() {
+    const el = document.getElementById('mindmapContent');
+    if (!el) return;
+    const tree = DB.knowledgeTree || {};
+    const subjects = Object.keys(tree);
+    if (subjects.length === 0) {
+      el.innerHTML = '<div class="empty-state">还没有知识树，请家长在设置中添加</div>';
+      return;
+    }
+
+    let html = '';
+    subjects.forEach(subject => {
+      const units = tree[subject] || {};
+      html += `<div class="mm-subject"><div class="mm-subject-name">${esc(subject)}</div>`;
+      for (const unit in units) {
+        const points = units[unit] || {};
+        const pointKeys = Object.keys(points);
+        const masteredCount = pointKeys.filter(p => points[p].mastered).length;
+        html += `
+          <div class="mm-unit">
+            <div class="mm-unit-name">📚 ${esc(unit)} <span class="mm-unit-progress">${masteredCount}/${pointKeys.length}</span></div>
+            <div class="mm-points">
+              ${pointKeys.map(p => {
+                const mastered = points[p].mastered;
+                return `<div class="mm-point ${mastered ? 'mastered' : ''}" data-subject="${esc(subject)}" data-unit="${esc(unit)}" data-point="${esc(p)}">${esc(p)}</div>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+      html += `</div>`;
+    });
+    el.innerHTML = html;
+
+    // 点击知识点语音播报 + 提示
+    el.querySelectorAll('.mm-point').forEach(point => {
+      point.addEventListener('click', () => {
+        const s = point.dataset.subject;
+        const u = point.dataset.unit;
+        const p = point.dataset.point;
+        const tree = DB.knowledgeTree;
+        const mastered = tree[s] && tree[s][u] && tree[s][u][p] ? tree[s][u][p].mastered : false;
+        speak(`${p}，${mastered ? '已经掌握啦，真棒' : '还在学习中，加油'}`);
+      });
+    });
+  },
+
+  /* ---- 课程表图片渲染（日程页） ---- */
+  renderScheduleImage() {
+    const el = document.getElementById('scheduleImageArea');
+    if (!el) return;
+    if (DB.scheduleImage && DB.scheduleImage.url) {
+      el.innerHTML = `
+        <div class="sched-img-card">
+          <div class="sched-img-header">
+            <span class="sched-img-title">📋 本学期课程表</span>
+            <button class="sched-img-del" id="scheduleImageDel" aria-label="删除课程表图片">🗑️</button>
+          </div>
+          <img src="${esc(DB.scheduleImage.url)}" class="sched-img" alt="课程表">
+          <div class="sched-img-updated">更新于 ${esc(DB.scheduleImage.updatedAt || '')}</div>
+        </div>
+      `;
+      const delBtn = document.getElementById('scheduleImageDel');
+      if (delBtn) delBtn.addEventListener('click', () => {
+        showConfirm('删除课程表图片', '确定要删除这张课程表图片吗？', () => {
+          DB.scheduleImage = null;
+          saveDB();
+          this.renderScheduleImage();
+          this.renderScheduleImagePreview();
+          toast('课程表图片已删除');
+        });
+      });
+    } else {
+      el.innerHTML = '';
+    }
+  },
+
+  /* ---- 课程表图片预览（家长模式） ---- */
+  renderScheduleImagePreview() {
+    const el = document.getElementById('scheduleImagePreview');
+    if (!el) return;
+    if (DB.scheduleImage && DB.scheduleImage.url) {
+      el.innerHTML = `<img src="${esc(DB.scheduleImage.url)}" class="sched-img-preview-img" alt="课程表预览">`;
+    } else {
+      el.innerHTML = '<div class="empty-state">未上传课程表图片</div>';
+    }
+  },
+
+  /* ---- 上传课程表图片 ---- */
+  uploadScheduleImage() {
+    // 动态创建 input 并挂载到 DOM，避免 iPad Safari 无法触发文件选择
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;';
+    document.body.appendChild(input);
+    input.onchange = () => {
+      const file = input.files && input.files[0];
+      input.remove();
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        DB.scheduleImage = {
+          url: reader.result,
+          updatedAt: todayStr()
+        };
+        saveDB();
+        this.renderScheduleImage();
+        this.renderScheduleImagePreview();
+        toast('课程表图片已更新 📋');
+      };
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  },
+
+  /* ---- 知识树编辑（家长模式） ---- */
+  renderKnowledgeTreeEdit() {
+    const el = document.getElementById('knowledgeTreeEdit');
+    if (!el) return;
+    const tree = DB.knowledgeTree || {};
+    const subjects = Object.keys(tree);
+    if (subjects.length === 0) {
+      el.innerHTML = '<div class="empty-state">暂无知识树</div>';
+      return;
+    }
+
+    el.innerHTML = subjects.map(subject => {
+      const units = tree[subject] || {};
+      return `
+        <div class="kt-subject">
+          <div class="kt-subject-header">
+            <span class="kt-subject-name">${esc(subject)}</span>
+            <button class="kt-add-unit-btn" data-subject="${esc(subject)}">➕ 单元</button>
+          </div>
+          ${Object.keys(units).map(unit => {
+            const points = units[unit] || {};
+            return `
+              <div class="kt-unit">
+                <div class="kt-unit-header">
+                  <span class="kt-unit-name">📚 ${esc(unit)}</span>
+                  <button class="kt-del-unit-btn" data-subject="${esc(subject)}" data-unit="${esc(unit)}">🗑️</button>
+                </div>
+                <div class="kt-points">
+                  ${Object.keys(points).map(point => {
+                    const isToday = (DB.dailyLearned || {})[todayStr()] && (DB.dailyLearned[todayStr()] || []).includes(KnowledgeReview.pointKey(subject, unit, point));
+                    return `
+                    <div class="kt-point">
+                      <span class="kt-point-name ${points[point].mastered ? 'mastered' : ''}">${esc(point)}</span>
+                      <button class="kt-today-btn ${isToday ? 'today' : ''}" data-subject="${esc(subject)}" data-unit="${esc(unit)}" data-point="${esc(point)}" title="标记为今天已学">${isToday ? '📌已学' : '📌今天学了'}</button>
+                      <button class="kt-toggle-btn" data-subject="${esc(subject)}" data-unit="${esc(unit)}" data-point="${esc(point)}">${points[point].mastered ? '✅' : '⬜'}</button>
+                      <button class="kt-del-point-btn" data-subject="${esc(subject)}" data-unit="${esc(unit)}" data-point="${esc(point)}">🗑️</button>
+                    </div>
+                  `;
+                  }).join('')}
+                </div>
+                <div class="kt-add-point">
+                  <input type="text" class="kt-add-point-input" data-subject="${esc(subject)}" data-unit="${esc(unit)}" placeholder="知识点（如：声母 b p m f）" maxlength="20">
+                  <button class="kt-add-point-btn" data-subject="${esc(subject)}" data-unit="${esc(unit)}">➕</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }).join('');
+
+    // 添加单元
+    el.querySelectorAll('.kt-add-unit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject;
+        const name = prompt('输入单元名称（如：汉语拼音）', '');
+        if (!name || !name.trim()) return;
+        const trimmed = name.trim();
+        if (!DB.knowledgeTree[subject]) DB.knowledgeTree[subject] = {};
+        if (DB.knowledgeTree[subject][trimmed]) { toast('该单元已存在'); return; }
+        DB.knowledgeTree[subject][trimmed] = {};
+        saveDB();
+        this.renderKnowledgeTreeEdit();
+        this.renderMindmap();
+        toast('单元已添加');
+      });
+    });
+
+    // 删除单元
+    el.querySelectorAll('.kt-del-unit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject;
+        const unit = btn.dataset.unit;
+        showConfirm('删除单元', `确定删除「${unit}」单元及其所有知识点吗？`, () => {
+          if (DB.knowledgeTree[subject]) delete DB.knowledgeTree[subject][unit];
+          saveDB();
+          this.renderKnowledgeTreeEdit();
+          this.renderMindmap();
+          toast('单元已删除');
+        });
+      });
+    });
+
+    // 添加知识点
+    el.querySelectorAll('.kt-add-point-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject;
+        const unit = btn.dataset.unit;
+        const input = el.querySelector(`.kt-add-point-input[data-subject="${CSS.escape(subject)}"][data-unit="${CSS.escape(unit)}"]`);
+        const name = input.value.trim();
+        if (!name) { toast('请输入知识点'); return; }
+        if (!DB.knowledgeTree[subject]) DB.knowledgeTree[subject] = {};
+        if (!DB.knowledgeTree[subject][unit]) DB.knowledgeTree[subject][unit] = {};
+        if (DB.knowledgeTree[subject][unit][name]) { toast('该知识点已存在'); return; }
+        DB.knowledgeTree[subject][unit][name] = { mastered: false };
+        saveDB();
+        this.renderKnowledgeTreeEdit();
+        this.renderMindmap();
+        toast('知识点已添加');
+      });
+    });
+
+    // 回车添加知识点
+    el.querySelectorAll('.kt-add-point-input').forEach(input => {
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          const btn = el.querySelector(`.kt-add-point-btn[data-subject="${CSS.escape(input.dataset.subject)}"][data-unit="${CSS.escape(input.dataset.unit)}"]`);
+          if (btn) btn.click();
+        }
+      });
+    });
+
+    // 标记今日已学
+    el.querySelectorAll('.kt-today-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject, unit = btn.dataset.unit, point = btn.dataset.point;
+        const marked = KnowledgeReview.toggleTodayLearned(subject, unit, point);
+        this.renderKnowledgeTreeEdit();
+        toast(marked ? '已标记为今天学了 📌' : '已取消今天已学标记');
+      });
+    });
+
+    // 切换掌握
+    el.querySelectorAll('.kt-toggle-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject, unit = btn.dataset.unit, point = btn.dataset.point;
+        const p = DB.knowledgeTree[subject][unit][point];
+        p.mastered = !p.mastered;
+        saveDB();
+        this.renderKnowledgeTreeEdit();
+        this.renderMindmap();
+        toast(p.mastered ? '已标记掌握' : '已标记未掌握');
+      });
+    });
+
+    // 删除知识点
+    el.querySelectorAll('.kt-del-point-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!requireParent()) return;
+        const subject = btn.dataset.subject, unit = btn.dataset.unit, point = btn.dataset.point;
+        showConfirm('删除知识点', `确定删除「${point}」吗？`, () => {
+          if (DB.knowledgeTree[subject] && DB.knowledgeTree[subject][unit]) delete DB.knowledgeTree[subject][unit][point];
+          saveDB();
+          this.renderKnowledgeTreeEdit();
+          this.renderMindmap();
+          toast('知识点已删除');
+        });
+      });
+    });
+  }
+};
+
+/* ====== 知识脑图 + 复习闯关模块 ====== */
+const KnowledgeReview = {
+  /* ---- 间隔重复的盒子算法（简化版 Leitner） ---- */
+  getBoxIntervals() {
+    return [1, 2, 4, 7, 15]; // 盒子0~4 对应的下次复习间隔（天）
+  },
+
+  pointKey(subject, unit, point) {
+    return `${subject}||${unit}||${point}`;
+  },
+
+  /* ---- 解析 pointKey 为 {subject, unit, point} ---- */
+  parseKey(key) {
+    const parts = key.split('||');
+    return { subject: parts[0], unit: parts[1], point: parts[2] };
+  },
+
+  /* ---- 获取今天已学的知识点列表 ---- */
+  getTodayLearned() {
+    const keys = (DB.dailyLearned || {})[todayStr()] || [];
+    const tree = DB.knowledgeTree || {};
+    const list = [];
+    keys.forEach(key => {
+      const p = this.parseKey(key);
+      // 校验知识点仍存在于知识树
+      if (tree[p.subject] && tree[p.subject][p.unit] && tree[p.subject][p.unit][p.point]) {
+        list.push({ subject: p.subject, unit: p.unit, point: p.point, key });
+      }
+    });
+    return list;
+  },
+
+  /* ---- 标记/取消今日已学 ---- */
+  toggleTodayLearned(subject, unit, point) {
+    const key = this.pointKey(subject, unit, point);
+    const today = todayStr();
+    if (!DB.dailyLearned) DB.dailyLearned = {};
+    if (!DB.dailyLearned[today]) DB.dailyLearned[today] = [];
+    const arr = DB.dailyLearned[today];
+    const idx = arr.indexOf(key);
+    if (idx >= 0) {
+      arr.splice(idx, 1);
+    } else {
+      arr.push(key);
+    }
+    saveDB();
+    return idx < 0; // 返回是否刚标记为已学
+  },
+
+  /* ---- 获取需要复习的知识点列表 ---- */
+  getDuePoints() {
+    const tree = DB.knowledgeTree || {};
+    const due = [];
+    const today = todayStr();
+    const learnedKeys = (DB.dailyLearned || {})[today] || [];
+    for (const subject in tree) {
+      for (const unit in tree[subject]) {
+        for (const point in tree[subject][unit]) {
+          const key = this.pointKey(subject, unit, point);
+          const state = (DB.reviewState || {})[key];
+          // 未掌握的知识点始终需要复习
+          if (!tree[subject][unit][point].mastered) {
+            due.push({ subject, unit, point, key, isToday: learnedKeys.includes(key) });
+          } else if (state && state.nextReview && state.nextReview <= today) {
+            // 已掌握但到了间隔复习时间的
+            due.push({ subject, unit, point, key, isToday: learnedKeys.includes(key) });
+          }
+        }
+      }
+    }
+    return due;
+  },
+
+  /* ---- 渲染复习闯关界面 ---- */
+  renderReview() {
+    const el = document.getElementById('mindmapContent');
+    if (!el) return;
+    const due = this.getDuePoints();
+    const todayLearned = this.getTodayLearned();
+    const tree = DB.knowledgeTree || {};
+    const totalPoints = Object.values(tree).reduce((s, units) => s + Object.values(units).reduce((s2, points) => s2 + Object.keys(points).length, 0), 0);
+    const mastered = Object.values(tree).reduce((s, units) => s + Object.values(units).reduce((s2, points) => s2 + Object.values(points).filter(p => p.mastered).length, 0), 0);
+
+    // 今天学的（优先展示），且还没掌握的
+    const todayToReview = todayLearned.filter(t => {
+      const p = tree[t.subject] && tree[t.subject][t.unit] && tree[t.subject][t.unit][t.point];
+      return p && !p.mastered;
+    });
+    // 待巩固（排除今天已学的）
+    const dueToReview = due.filter(d => !d.isToday);
+
+    el.innerHTML = `
+      <div class="review-overview">
+        <div class="review-overview-stat">🎯 已掌握 ${mastered}/${totalPoints}</div>
+        <div class="review-overview-stat">📌 今天学了 ${todayLearned.length} 个</div>
+      </div>
+
+      <div class="review-section">
+        <h4 class="review-section-title">📌 今天学的（优先复习）</h4>
+        ${todayToReview.length > 0
+          ? todayToReview.map(d => `<div class="review-due-item today" data-key="${esc(d.key)}" data-subject="${esc(d.subject)}" data-unit="${esc(d.unit)}" data-point="${esc(d.point)}">
+              <span class="review-due-subject">${esc(d.subject)}</span>
+              <span class="review-due-point">${esc(d.point)}</span>
+              <span class="review-due-tag">今天</span>
+            </div>`).join('')
+          : (todayLearned.length > 0
+            ? '<div class="empty-state small">🎉 今天学的都掌握啦！</div>'
+            : '<div class="empty-state small">家长可在设置里标记今天学的知识点</div>')}
+      </div>
+
+      <div class="review-section">
+        <h4 class="review-section-title">🔄 待巩固</h4>
+        ${dueToReview.length > 0
+          ? dueToReview.map(d => `<div class="review-due-item" data-key="${esc(d.key)}" data-subject="${esc(d.subject)}" data-unit="${esc(d.unit)}" data-point="${esc(d.point)}">
+              <span class="review-due-subject">${esc(d.subject)}</span>
+              <span class="review-due-point">${esc(d.point)}</span>
+            </div>`).join('')
+          : '<div class="empty-state small">没有待巩固的知识点</div>'}
+      </div>
+    `;
+
+    // 点击开始复习
+    el.querySelectorAll('.review-due-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.startQuiz(item.dataset.subject, item.dataset.unit, item.dataset.point);
+      });
+    });
+  },
+
+  /* ---- 开始单个知识点的闯关 ---- */
+  startQuiz(subject, unit, point) {
+    const tree = DB.knowledgeTree;
+    if (!tree[subject] || !tree[subject][unit]) return;
+
+    // 生成语音选择题（针对拼音/识字/数学的不同题型）
+    const question = this.generateQuestion(subject, unit, point);
+
+    if (!question) {
+      toast('这个知识点暂时没有题目，家长可先在设置里标记掌握');
+      return;
+    }
+
+    const el = document.getElementById('mindmapContent');
+    el.innerHTML = `
+      <div class="quiz-screen">
+        <div class="quiz-subject">${esc(subject)} · ${esc(unit)}</div>
+        <div class="quiz-question-text">${esc(question.question)}</div>
+        <button class="quiz-speak-btn" id="quizSpeakBtn" aria-label="再听一遍">🔊 再听一遍</button>
+        <div class="quiz-options">
+          ${question.options.map((opt, i) => `<button class="quiz-option" data-index="${i}">${esc(opt)}</button>`).join('')}
+        </div>
+        <div class="quiz-feedback" id="quizFeedback"></div>
+      </div>
+    `;
+
+    // 语音读题
+    speak(question.speakText || question.question, 'zh-CN');
+
+    const speakBtn = document.getElementById('quizSpeakBtn');
+    if (speakBtn) speakBtn.addEventListener('click', () => speak(question.speakText || question.question, 'zh-CN'));
+
+    el.querySelectorAll('.quiz-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const idx = parseInt(opt.dataset.index);
+        this.answerQuiz(subject, unit, point, question, idx);
+      });
+    });
+  },
+
+  /* ---- 生成题目（一年级题型） ---- */
+  generateQuestion(subject, unit, point) {
+    // 拼音题
+    if (subject === '语文' && unit === '汉语拼音') {
+      return this.generatePinyinQuestion(point);
+    }
+    // 识字题
+    if (subject === '语文' && unit === '识字') {
+      return this.generateLiteracyQuestion(point);
+    }
+    // 数学加减法题
+    if (subject === '数学') {
+      return this.generateMathQuestion(point);
+    }
+    // 通用：问"这个知识点学会了吗"
+    return {
+      question: `「${point}」你学会了吗？`,
+      speakText: point,
+      options: ['学会了', '还不太会'],
+      correct: 0
+    };
+  },
+
+  /* ---- 拼音题 ---- */
+  generatePinyinQuestion(point) {
+    // 从知识点名称里提取拼音字母
+    const letters = point.replace(/[^a-zü]/g, '');
+    if (!letters) return null;
+    const target = letters[0];
+    const pinyinMap = {
+      'a': '啊', 'o': '喔', 'e': '鹅', 'i': '衣', 'u': '乌', 'ü': '鱼',
+      'b': '波', 'p': '坡', 'm': '摸', 'f': '佛', 'd': '得', 't': '特',
+      'n': '讷', 'l': '勒', 'g': '哥', 'k': '科', 'h': '喝', 'j': '鸡',
+      'q': '七', 'x': '西', 'z': '资', 'c': '刺', 's': '丝', 'r': '日',
+      'y': '衣', 'w': '屋'
+    };
+    const correct = pinyinMap[target];
+    if (!correct) return null;
+    // 生成3个干扰项
+    const allChars = Object.values(pinyinMap);
+    const distractors = [];
+    while (distractors.length < 3) {
+      const d = allChars[Math.floor(Math.random() * allChars.length)];
+      if (d !== correct && !distractors.includes(d)) distractors.push(d);
+    }
+    const options = [correct, ...distractors].sort(() => Math.random() - 0.5);
+    const correctIdx = options.indexOf(correct);
+    return {
+      question: `这个拼音读什么？`,
+      speakText: `这个拼音读什么？`,
+      options,
+      correct: correctIdx
+    };
+  },
+
+  /* ---- 识字题 ---- */
+  generateLiteracyQuestion(point) {
+    // 从知识点里提取汉字（去掉空格）
+    const chars = point.replace(/\s/g, '');
+    const target = chars[0];
+    if (!target) return null;
+    // 用"这个字怎么读"的形式，选项是读音（用拼音表示）
+    // 简化：让选项是几个汉字，问哪个是目标字
+    const pool = ['天', '地', '人', '你', '我', '他', '金', '木', '水', '火', '土', '口', '耳', '目', '手', '足', '日', '月', '山', '石', '田', '禾'];
+    const distractors = [];
+    while (distractors.length < 3) {
+      const d = pool[Math.floor(Math.random() * pool.length)];
+      if (d !== target && !distractors.includes(d)) distractors.push(d);
+    }
+    const options = [target, ...distractors].sort(() => Math.random() - 0.5);
+    const correctIdx = options.indexOf(target);
+    return {
+      question: `哪个字是「${target}」？`,
+      speakText: `请找出「${target}」这个字`,
+      options,
+      correct: correctIdx
+    };
+  },
+
+  /* ---- 数学题 ---- */
+  generateMathQuestion(point) {
+    // 根据知识点难度出题
+    let max = 10;
+    if (point.includes('20')) max = 20;
+    if (point.includes('进位')) max = 20;
+    const a = Math.floor(Math.random() * (max - 1)) + 1;
+    const b = Math.floor(Math.random() * (max - a)) + 1;
+    const answer = a + b;
+    const options = [answer];
+    while (options.length < 4) {
+      const d = answer + (Math.floor(Math.random() * 5) - 2);
+      if (d >= 0 && !options.includes(d)) options.push(d);
+    }
+    options.sort(() => Math.random() - 0.5);
+    const correctIdx = options.indexOf(answer);
+    return {
+      question: `${a} + ${b} = ？`,
+      speakText: `${a} 加 ${b} 等于几？`,
+      options: options.map(String),
+      correct: correctIdx
+    };
+  },
+
+  /* ---- 答题反馈 ---- */
+  answerQuiz(subject, unit, point, question, chosenIdx) {
+    const el = document.getElementById('mindmapContent');
+    const feedback = document.getElementById('quizFeedback');
+    const correct = chosenIdx === question.correct;
+
+    const key = this.pointKey(subject, unit, point);
+    const tree = DB.knowledgeTree;
+
+    if (correct) {
+      feedback.innerHTML = '✅ 答对啦！真棒！💎+1';
+      speak('答对啦，真棒！获得一颗绿宝石！', 'zh-CN');
+
+      // 加宝石
+      DB.starLog.total += 1;
+      DB.starLog.totalEarned = (DB.starLog.totalEarned || 0) + 1;
+      DB.starLog.history.unshift({
+        date: todayStr(),
+        time: new Date().toTimeString().substr(0, 5),
+        taskId: key,
+        taskName: point,
+        taskIcon: '🧠',
+        stars: 1
+      });
+
+      // 更新间隔重复盒子
+      if (!DB.reviewState) DB.reviewState = {};
+      const state = DB.reviewState[key] || { box: 0, correct: 0 };
+      state.correct = (state.correct || 0) + 1;
+      state.box = Math.min(4, state.box + 1);
+      const intervals = this.getBoxIntervals();
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + intervals[state.box]);
+      state.nextReview = this.dateStr(nextDate);
+
+      // 连续答对3次标记掌握
+      if (state.correct >= 3) {
+        if (tree[subject] && tree[subject][unit] && tree[subject][unit][point]) {
+          tree[subject][unit][point].mastered = true;
+        }
+        speak('太棒了，这个知识点已经掌握啦！', 'zh-CN');
+      }
+      DB.reviewState[key] = state;
+
+      starRain(5);
+      playChime();
+    } else {
+      feedback.innerHTML = '❌ 再想想哦，点 🔊 再听一遍';
+      speak('再想想哦，加油！', 'zh-CN');
+      // 答错重置盒子
+      if (!DB.reviewState) DB.reviewState = {};
+      const state = DB.reviewState[key] || { box: 0, correct: 0 };
+      state.box = 0;
+      state.correct = 0;
+      const nextDate = new Date();
+      nextDate.setDate(nextDate.getDate() + 1);
+      state.nextReview = this.dateStr(nextDate);
+      DB.reviewState[key] = state;
+    }
+
+    saveDB();
+    updateStarDisplay();
+    checkPetEvolution();
+
+    // 延迟后重新出题或返回
+    setTimeout(() => {
+      if (correct) {
+        // 答对后回到复习列表
+        this.renderReview();
+      } else {
+        // 答错重新出题
+        this.startQuiz(subject, unit, point);
+      }
+    }, 1200);
+  },
+
+  dateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+};
+
 /* ====== 工具面板开关 ====== */
 function openTool(toolName) {
   // 趣味乐园需要家长密码验证才能进入
@@ -2453,9 +3842,15 @@ function _doOpenTool(toolName) {
     panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (toolName === 'math') MathPractice.showStart();
     if (toolName === 'fun') FunPark.showHome();
+    if (toolName === 'mistakes') StudyTracker.renderMistakes();
+    if (toolName === 'mindmap') StudyTracker.renderMindmap();
+    if (toolName === 'report') {
+      StudyTracker.renderWeekHeatmap();
+      StudyTracker.renderReport();
+    }
   }
   // 语音播报工具名称
-  const toolNames = { timer: '计时器', calculator: '计算器', pinyin: '拼音表', words: '单词卡', memo: '备忘录', math: '数学练习', fun: '趣味乐园' };
+  const toolNames = { timer: '计时器', calculator: '计算器', pinyin: '拼音表', words: '单词卡', memo: '备忘录', math: '数学练习', mistakes: '错题本', mindmap: '知识脑图', report: '学习报告', fun: '趣味乐园' };
   speak(toolNames[toolName]);
 }
 
@@ -2598,6 +3993,7 @@ function bindEvents() {
     DB.settings.mode = 'holiday';
     saveDB();
     renderSettingsPage();
+    updateSchoolOnlyTools();
     toast('已切换到假期模式');
   });
   document.getElementById('modeSchool').addEventListener('click', () => {
@@ -2606,6 +4002,7 @@ function bindEvents() {
     DB.settings.mode = 'school';
     saveDB();
     renderSettingsPage();
+    updateSchoolOnlyTools();
     toast('已切换到开学模式');
   });
 
@@ -2633,6 +4030,11 @@ function bindEvents() {
   document.getElementById('rewardAddBtn').addEventListener('click', addReward);
   document.getElementById('passwordSaveBtn').addEventListener('click', changePassword);
   document.getElementById('hwSubjectAddBtn').addEventListener('click', addHomeworkSubject);
+  const scheduleImageUploadBtn = document.getElementById('scheduleImageUploadBtn');
+  if (scheduleImageUploadBtn) scheduleImageUploadBtn.addEventListener('click', () => {
+    if (!requireParent()) return;
+    StudyTracker.uploadScheduleImage();
+  });
   document.getElementById('hwSubjectName').addEventListener('keydown', e => {
     if (e.key === 'Enter') addHomeworkSubject();
   });
@@ -2677,6 +4079,46 @@ function bindEvents() {
   });
   document.querySelectorAll('.fun-col-tab').forEach(tab => {
     tab.addEventListener('click', () => FunPark.switchCollectionTab(tab.dataset.colTab));
+  });
+
+  // 错题本
+  const mistakeAddBtn = document.getElementById('mistakeAddBtn');
+  if (mistakeAddBtn) mistakeAddBtn.addEventListener('click', () => StudyTracker.addMistakeFromPhoto());
+  const mistakeFilter = document.getElementById('mistakeFilterSubject');
+  if (mistakeFilter) mistakeFilter.addEventListener('change', () => StudyTracker.renderMistakes());
+
+  // 知识脑图 tab 切换
+  document.querySelectorAll('.mindmap-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.mindmap-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      if (tab.dataset.mmTab === 'map') {
+        StudyTracker.renderMindmap();
+      } else {
+        KnowledgeReview.renderReview();
+      }
+    });
+  });
+
+  // 学习报告
+  document.querySelectorAll('.report-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.report-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const which = tab.dataset.reportTab;
+      document.getElementById('reportWeek').style.display = which === 'week' ? '' : 'none';
+      document.getElementById('reportReport').style.display = which === 'report' ? '' : 'none';
+      if (which === 'week') StudyTracker.renderWeekHeatmap();
+      if (which === 'report') StudyTracker.renderReport();
+    });
+  });
+  const weekNoteSaveBtn = document.getElementById('weekNoteSaveBtn');
+  if (weekNoteSaveBtn) weekNoteSaveBtn.addEventListener('click', () => StudyTracker.saveWeekNote());
+  const reportGenBtn = document.getElementById('reportGenBtn');
+  if (reportGenBtn) reportGenBtn.addEventListener('click', () => {
+    StudyTracker.generateWeeklyReport();
+    StudyTracker.renderReport();
+    toast('周报已生成 📊');
   });
 }
 
@@ -3958,6 +5400,7 @@ function init() {
   lastPetLevel = getPetInfo().level;
   updateModeBadge();
   updateStarDisplay();
+  updateSchoolOnlyTools();
   renderSchedulePage();
   // 启动 Supabase 云端同步（异步，不阻塞首屏）
   if (typeof startSupabaseSync === 'function') {
